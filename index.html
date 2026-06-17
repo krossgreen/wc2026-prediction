@@ -193,6 +193,19 @@
     return 0;
   };
 
+  // Local YYYY-MM-DD for today (avoids UTC off-by-one from toISOString).
+  const todayStr = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  // Pretty label for a YYYY-MM-DD matchday, e.g. "Mon, Jun 15".
+  const formatDay = (d) => {
+    if (!d || d === 'Undated') return 'Undated';
+    const dt = new Date(d + 'T00:00:00');
+    if (isNaN(dt)) return d;
+    return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
   // --- Initial Mock Data ---
   const initialUsers = [
     { id: 'u1', name: 'User 1' },
@@ -216,8 +229,9 @@
   ];
 
   const initialRealResults = [
-    { id: 'r1', team1: 'Belgium', team2: 'Egypt', score1: 2, score2: 1 },
-    { id: 'r2', team1: 'Saudi Arabia', team2: 'Uruguay', score1: 0, score2: 2 }
+    { id: 'r3', date: '2026-06-14', team1: 'Iran', team2: 'New Zealand', score1: 3, score2: 0 },
+    { id: 'r1', date: '2026-06-15', team1: 'Belgium', team2: 'Egypt', score1: 2, score2: 1 },
+    { id: 'r2', date: '2026-06-15', team1: 'Saudi Arabia', team2: 'Uruguay', score1: 0, score2: 2 }
   ];
 
   function App() {
@@ -285,12 +299,51 @@
         if (s.exactMatches > 0 && s.totalPoints === minPts) s.badges.push({ icon: '🎲', title: 'Wildcard (Hits upsets but low average)' });
       });
 
-      return stats.sort((a, b) => {
+      const tiebreak = (a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints; // PTS (more)
         if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
         if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
         return b.correctOutcomes - a.correctOutcomes; // OUTCOME (more)
+      };
+      stats.sort(tiebreak);
+
+      // --- Movement vs the previous matchday ---
+      // Re-rank using only results up to (but excluding) the latest matchday,
+      // then compare each player's prior rank to their current rank.
+      const rankBy = (resultSet) => {
+        const rows = users.map(user => {
+          let totalPoints = 0, exactMatches = 0, correctOutcomes = 0, completedPicks = 0;
+          const preds = predictions.filter(p => p.userId === user.id);
+          resultSet.forEach(real => {
+            const pred = preds.find(p =>
+              normalizeTeamName(p.team1) === normalizeTeamName(real.team1) &&
+              normalizeTeamName(p.team2) === normalizeTeamName(real.team2));
+            if (pred) {
+              completedPicks++;
+              const pts = calculatePoints(pred, real);
+              totalPoints += pts;
+              if (pts === 3) exactMatches++; else if (pts === 1) correctOutcomes++;
+            }
+          });
+          return { id: user.id, totalPoints, exactMatches, correctOutcomes, completedPicks };
+        });
+        rows.sort(tiebreak);
+        const map = {};
+        rows.forEach((r, i) => { map[r.id] = i + 1; });
+        return map;
+      };
+
+      const days = [...new Set(realResults.map(r => r.date || ''))].sort();
+      let prevRanks = null;
+      if (days.length >= 2) {
+        const latestDay = days[days.length - 1];
+        prevRanks = rankBy(realResults.filter(r => (r.date || '') < latestDay));
+      }
+      stats.forEach((s, i) => {
+        s.movement = prevRanks ? (prevRanks[s.id] - (i + 1)) : null; // + up, - down, 0 same
       });
+
+      return stats;
     }, [users, predictions, realResults]);
 
     // --- Main Render ---
@@ -379,6 +432,7 @@
 
   function LeaderboardView({ leaderboard, realResults, showBadges, setShowBadges }) {
     const top3 = leaderboard.slice(0, 3);
+    const leaderPoints = (leaderboard[0] && leaderboard[0].totalPoints) || 0;
 
     return (
       <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
@@ -461,10 +515,18 @@
 
             <div className="space-y-2 text-xl md:text-3xl">
               {leaderboard.map((user, idx) => (
-                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors ${idx === 0 ? 'leader-foil bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300' : idx === 2 ? 'bg-amber-950/40 text-amber-600' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
+                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors relative overflow-hidden ${idx === 0 ? 'leader-foil bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300' : idx === 2 ? 'bg-amber-950/40 text-amber-600' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
                   <div className="col-span-1 flex flex-col items-center justify-center leading-none gap-0.5">
                     {idx === 0 && <Crown className="leader-crown text-[#D4AF37]" size={18} />}
                     <span>{idx + 1}</span>
+                    {user.movement != null && (
+                      <span
+                        className={`text-[11px] md:text-xs font-sans font-bold ${user.movement > 0 ? 'text-green-400' : user.movement < 0 ? 'text-red-400' : 'text-gray-500'}`}
+                        title="Change vs last matchday"
+                      >
+                        {user.movement > 0 ? '▲' + user.movement : user.movement < 0 ? '▼' + Math.abs(user.movement) : '–'}
+                      </span>
+                    )}
                   </div>
                   <div className="col-span-4 flex flex-wrap md:flex-nowrap items-center gap-1 md:gap-2">
                     <span className="truncate">{user.name}</span>
@@ -483,6 +545,15 @@
                   <div className="col-span-1 text-center text-green-400 bg-green-900/20 py-1 rounded mx-0.5 md:mx-1">{user.exactMatches}</div>
                   <div className="col-span-2 text-center text-blue-400 bg-blue-900/20 py-1 rounded mx-0.5 md:mx-1">{user.correctOutcomes}</div>
                   <div className={`col-span-1 text-center drop-shadow-[0_0_5px_rgba(212,175,55,0.5)] ${idx === 0 ? 'text-4xl md:text-5xl text-amber-300 font-black' : 'text-3xl md:text-4xl text-amber-400'}`}>{user.totalPoints}</div>
+
+                  {/* gap-to-leader bar (width = points relative to the leader) */}
+                  {leaderPoints > 0 && user.totalPoints > 0 && (
+                    <div
+                      className="left-0 bottom-0 h-1 bg-gradient-to-r from-[#D4AF37] to-amber-300/20"
+                      style={{ position: 'absolute', width: `${Math.round((user.totalPoints / leaderPoints) * 100)}%` }}
+                      title={idx === 0 ? 'Leader' : `${leaderPoints - user.totalPoints} pts behind leader`}
+                    ></div>
+                  )}
                 </div>
               ))}
             </div>
@@ -768,6 +839,7 @@
     const [t2, setT2] = useState('');
     const [s1, setS1] = useState('');
     const [s2, setS2] = useState('');
+    const [date, setDate] = useState(todayStr());
 
     const upcomingMatches = useMemo(() => {
       const matchMap = {};
@@ -790,10 +862,11 @@
 
     const handleAddResult = (e) => {
       e.preventDefault();
-      if (!t1 || !t2 || s1 === '' || s2 === '') return;
+      if (!t1 || !t2 || s1 === '' || s2 === '' || !date) return;
 
       const newResult = {
         id: `r${Date.now()}`,
+        date,
         team1: t1.trim(),
         team2: t2.trim(),
         score1: parseInt(s1, 10),
@@ -811,6 +884,16 @@
     const removeResult = (id) => {
       setRealResults(realResults.filter(r => r.id !== id));
     };
+
+    // Group logged results into matchdays (by date) for the History Books.
+    const dayGroups = [...realResults]
+      .sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.id.localeCompare(b.id))
+      .reduce((acc, r) => {
+        const d = r.date || 'Undated';
+        (acc[d] = acc[d] || []).push(r);
+        return acc;
+      }, {});
+    const orderedDays = Object.keys(dayGroups).sort();
 
     return (
       <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -867,6 +950,13 @@
              <div className="absolute top-0 bottom-0 left-10 w-0.5 bg-red-400/50 z-10 pointer-events-none"></div>
 
              <h3 className="text-lg font-caveat font-bold text-gray-500 mb-4 ml-8 tracking-wider">Log Official Full Time Score</h3>
+             <div className="flex items-center gap-3 mb-4 pl-8 relative z-20">
+              <label className="font-oswald uppercase tracking-widest text-xs font-bold text-gray-500">Match Day</label>
+              <input
+                type="date" value={date} onChange={e => setDate(e.target.value)} required
+                className="p-2 bg-white/70 border-2 border-gray-400 rounded font-caveat text-lg font-bold text-gray-700 outline-none focus:border-[#D4AF37]"
+              />
+             </div>
              <div className="flex flex-col md:flex-row items-center gap-4 relative z-20 pl-8">
               <input
                 type="text" placeholder="Home Team (e.g. France)"
@@ -903,41 +993,49 @@
           <div>
             <h3 className="text-xl font-bold font-oswald text-gray-800 mb-4 border-b pb-2 uppercase tracking-wide">History Books (Official Results)</h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6 pt-4">
-              {realResults.map((r, index) => (
-                <div key={r.id} className="relative flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded shadow-sm hover:shadow-md transition-shadow">
-
-                  {/* Vintage Match Order Badge */}
-                  <div className="absolute -top-3 left-4 bg-[#1B4D3E] text-[#D4AF37] text-xs font-oswald font-black uppercase tracking-widest px-3 py-1 rounded shadow-sm">
-                    Match #{index + 1}
+            {realResults.length === 0 ? (
+              <div className="py-8 text-center text-gray-500 italic">
+                The tournament hasn't started yet. No official results logged.
+              </div>
+            ) : (
+              orderedDays.map((day, dayIdx) => (
+                <div key={day} className="mb-6">
+                  <div className="flex items-center gap-3 mb-3 mt-2">
+                    <span className="bg-[#1B4D3E] text-[#D4AF37] font-oswald font-black uppercase tracking-widest text-xs px-3 py-1 rounded shadow-sm whitespace-nowrap">
+                      Matchday {dayIdx + 1}
+                    </span>
+                    <span className="font-caveat text-xl font-bold text-gray-600 whitespace-nowrap">{formatDay(day)}</span>
+                    <span className="text-xs text-gray-400 font-bold">{dayGroups[day].length} match{dayGroups[day].length === 1 ? '' : 'es'}</span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
                   </div>
 
-                  <div className="flex-1 font-bold flex items-center justify-end gap-2 text-right text-gray-800">
-                    {r.team1} <span className="text-2xl">{getFlagEmoji(r.team1)}</span>
-                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-4">
+                    {dayGroups[day].map(r => (
+                      <div key={r.id} className="relative flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex-1 font-bold flex items-center justify-end gap-2 text-right text-gray-800">
+                          {r.team1} <span className="text-2xl">{getFlagEmoji(r.team1)}</span>
+                        </div>
 
-                  <div className="px-4 mx-2 bg-black text-white font-vt323 text-3xl py-1 rounded shadow-inner">
-                    {r.score1} - {r.score2}
-                  </div>
+                        <div className="px-4 mx-2 bg-black text-white font-vt323 text-3xl py-1 rounded shadow-inner">
+                          {r.score1} - {r.score2}
+                        </div>
 
-                  <div className="flex-1 font-bold flex items-center gap-2 text-gray-800">
-                    <span className="text-2xl">{getFlagEmoji(r.team2)}</span> {r.team2}
-                  </div>
+                        <div className="flex-1 font-bold flex items-center gap-2 text-gray-800">
+                          <span className="text-2xl">{getFlagEmoji(r.team2)}</span> {r.team2}
+                        </div>
 
-                  <button
-                    onClick={() => removeResult(r.id)}
-                    className="ml-4 text-red-400 hover:text-red-600 font-bold text-sm bg-red-50 hover:bg-red-100 p-2 rounded"
-                  >
-                    Delete
-                  </button>
+                        <button
+                          onClick={() => removeResult(r.id)}
+                          className="ml-4 text-red-400 hover:text-red-600 font-bold text-sm bg-red-50 hover:bg-red-100 p-2 rounded"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-              {realResults.length === 0 && (
-                <div className="col-span-full py-8 text-center text-gray-500 italic">
-                  The tournament hasn't started yet. No official results logged.
-                </div>
-              )}
-            </div>
+              ))
+            )}
           </div>
         </div>
       </div>
