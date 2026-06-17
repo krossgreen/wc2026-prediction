@@ -11,3 +11,7 @@ desktop.ini
 # Node (only relevant if you later add a build setup)
 node_modules/
 dist/
+
+# Local preview tooling (dev-only, not part of the app)
+.claude/
+.preview-server.js
