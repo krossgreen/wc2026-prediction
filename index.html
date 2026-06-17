@@ -597,7 +597,7 @@
                   {/* gap-to-leader bar (width = points relative to the leader) */}
                   {leaderPoints > 0 && user.totalPoints > 0 && (
                     <div
-                      className="left-0 bottom-0 h-1 bg-gradient-to-r from-[#D4AF37] to-amber-300/20"
+                      className="left-0 bottom-0 h-0.5 bg-gradient-to-r from-[#D4AF37]/25 to-amber-300/0"
                       style={{ position: 'absolute', width: `${Math.round((user.totalPoints / leaderPoints) * 100)}%` }}
                       title={idx === 0 ? 'Leader' : `${leaderPoints - user.totalPoints} pts behind leader`}
                     ></div>
