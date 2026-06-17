@@ -439,6 +439,10 @@
     const [exporting, setExporting] = useState(false);
 
     // Save the standings panel as a PNG to share in the group chat.
+    // Before capturing we (1) freeze animations and hide the leader's foil
+    // sweep so we get a clean static frame, and (2) zero the panel's margin —
+    // the parent's space-y-8 adds a 32px top margin that html-to-image would
+    // otherwise bake in, pushing the content down (empty top, cut bottom).
     const exportStandings = async () => {
       const node = document.getElementById('standings-capture');
       if (!node || !window.htmlToImage) {
@@ -446,10 +450,17 @@
         return;
       }
       setExporting(true);
+      const freeze = document.createElement('style');
+      freeze.textContent =
+        '#standings-capture *,#standings-capture *::before,#standings-capture *::after{animation:none!important;transition:none!important}' +
+        '#standings-capture .leader-foil::after{display:none!important}';
+      document.head.appendChild(freeze);
       try {
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
         const dataUrl = await window.htmlToImage.toPng(node, {
           backgroundColor: '#111111',
-          pixelRatio: 2
+          pixelRatio: 2,
+          style: { margin: '0' }
         });
         const a = document.createElement('a');
         a.download = `texaus-standings-${todayStr()}.png`;
@@ -458,6 +469,7 @@
       } catch (err) {
         alert('Sorry, the image export failed: ' + (err && err.message ? err.message : err));
       } finally {
+        freeze.remove();
         setExporting(false);
       }
     };
