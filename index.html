@@ -576,14 +576,14 @@
               </div>
             )}
 
-            <div className="grid grid-cols-12 gap-1 md:gap-2 text-gray-500 text-lg md:text-2xl uppercase mb-2 border-b border-[#333] pb-2">
+            <div className="grid grid-cols-12 gap-1 md:gap-2 text-gray-400 font-oswald font-bold text-[11px] md:text-sm uppercase tracking-wider mb-2 border-b border-[#333] pb-2">
               <div className="col-span-1 text-center">Pos</div>
               <div className="col-span-4">Player</div>
               <div className="col-span-2 text-center" title="Form Guide (Last 5)">Form</div>
               <div className="col-span-1 text-center" title="Completed Predictions">Picks</div>
               <div className="col-span-1 text-center" title="Exact Score (3pts)">Exact</div>
-              <div className="col-span-2 text-center" title="Correct Outcome (1pt)">Outcome</div>
-              <div className="col-span-1 text-center text-amber-500">Pts</div>
+              <div className="col-span-1 text-center" title="Correct Outcome (1pt)">Outcome</div>
+              <div className="col-span-2 text-center text-amber-500">Pts</div>
             </div>
 
             <div className="space-y-2 text-xl md:text-3xl">
@@ -616,8 +616,8 @@
                   </div>
                   <div className="col-span-1 text-center text-gray-300 bg-gray-900/40 py-1 rounded mx-0.5 md:mx-1">{user.completedPicks}</div>
                   <div className="col-span-1 text-center text-green-400 bg-green-900/20 py-1 rounded mx-0.5 md:mx-1">{user.exactMatches}</div>
-                  <div className="col-span-2 text-center text-blue-400 bg-blue-900/20 py-1 rounded mx-0.5 md:mx-1">{user.correctOutcomes}</div>
-                  <div className={`col-span-1 text-center drop-shadow-[0_0_5px_rgba(212,175,55,0.5)] ${idx === 0 ? 'text-4xl md:text-5xl text-amber-300 font-black' : 'text-3xl md:text-4xl text-amber-400'}`}>{user.totalPoints}</div>
+                  <div className="col-span-1 text-center text-blue-400 bg-blue-900/20 py-1 rounded mx-0.5 md:mx-1">{user.correctOutcomes}</div>
+                  <div className={`col-span-2 text-center drop-shadow-[0_0_5px_rgba(212,175,55,0.5)] ${idx === 0 ? 'text-4xl md:text-5xl text-amber-300 font-black' : 'text-3xl md:text-4xl text-amber-400'}`}>{user.totalPoints}</div>
 
                   {/* gap-to-leader bar (width = points relative to the leader) */}
                   {leaderPoints > 0 && user.totalPoints > 0 && (
