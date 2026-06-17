@@ -30,6 +30,9 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/lucide@0.379.0/dist/umd/lucide.js"></script>
+  <!-- DOM-to-image export. Renders via SVG <foreignObject> so it handles modern
+       CSS (oklch colors, gradients, blend modes) that html2canvas chokes on. -->
+  <script crossorigin src="https://unpkg.com/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
   <style> html, body, #root { min-height: 100%; margin: 0; } </style>
 </head>
@@ -433,11 +436,36 @@
   function LeaderboardView({ leaderboard, realResults, showBadges, setShowBadges }) {
     const top3 = leaderboard.slice(0, 3);
     const leaderPoints = (leaderboard[0] && leaderboard[0].totalPoints) || 0;
+    const [exporting, setExporting] = useState(false);
+
+    // Save the standings panel as a PNG to share in the group chat.
+    const exportStandings = async () => {
+      const node = document.getElementById('standings-capture');
+      if (!node || !window.htmlToImage) {
+        alert('Export tool is still loading — give it a second and try again.');
+        return;
+      }
+      setExporting(true);
+      try {
+        const dataUrl = await window.htmlToImage.toPng(node, {
+          backgroundColor: '#111111',
+          pixelRatio: 2
+        });
+        const a = document.createElement('a');
+        a.download = `texaus-standings-${todayStr()}.png`;
+        a.href = dataUrl;
+        a.click();
+      } catch (err) {
+        alert('Sorry, the image export failed: ' + (err && err.message ? err.message : err));
+      } finally {
+        setExporting(false);
+      }
+    };
 
     return (
       <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
 
-        <div className="flex justify-end gap-4 mb-2">
+        <div className="flex justify-end items-center gap-3 mb-2">
           <button
             onClick={() => setShowBadges(!showBadges)}
             className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#1B4D3E] transition-colors bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-200"
@@ -445,10 +473,18 @@
             {showBadges ? <ToggleRight className="text-[#D4AF37]" size={20} /> : <ToggleLeft size={20} />}
             Player Badges
           </button>
+          <button
+            onClick={exportStandings}
+            disabled={exporting}
+            title="Save the standings as an image to share"
+            className="flex items-center gap-2 text-sm font-bold text-[#1B4D3E] bg-[#D4AF37] hover:bg-amber-400 transition-colors px-4 py-1.5 rounded-full shadow-sm border border-amber-500/40 disabled:opacity-60 disabled:cursor-wait"
+          >
+            <Download size={18} /> {exporting ? 'Saving…' : 'Save Image'}
+          </button>
         </div>
 
         {/* Stadium Scoreboard */}
-        <div className="bg-[#111] border-8 border-[#333] rounded-lg p-6 shadow-2xl relative overflow-hidden font-vt323">
+        <div id="standings-capture" className="bg-[#111] border-8 border-[#333] rounded-lg p-6 shadow-2xl relative overflow-hidden font-vt323">
           {/* Subtle grid pattern background for scoreboard */}
           <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#222 1px, transparent 1px), linear-gradient(90deg, #222 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
