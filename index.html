@@ -177,14 +177,39 @@
     return name.toLowerCase().replace(/[^a-z]/g, '');
   };
 
+  // normalizedTeamName -> ISO 3166-1 alpha-2 (for flagcdn images). Covers the
+  // realistic World Cup field; anything unmapped falls back to a lettered chip.
+  const TEAM_ISO = {
+    france:'fr', senegal:'sn', iraq:'iq', norway:'no', argentina:'ar', algeria:'dz',
+    austria:'at', jordan:'jo', belgium:'be', egypt:'eg', saudiarabia:'sa', uruguay:'uy',
+    iran:'ir', newzealand:'nz',
+    brazil:'br', spain:'es', germany:'de', england:'gb-eng', scotland:'gb-sct', wales:'gb-wls',
+    portugal:'pt', netherlands:'nl', holland:'nl', italy:'it', croatia:'hr', denmark:'dk',
+    switzerland:'ch', poland:'pl', serbia:'rs', morocco:'ma', tunisia:'tn', ghana:'gh',
+    cameroon:'cm', nigeria:'ng', ivorycoast:'ci', senegalese:'sn', southafrica:'za',
+    mexico:'mx', usa:'us', unitedstates:'us', canada:'ca', costarica:'cr', ecuador:'ec',
+    colombia:'co', peru:'pe', paraguay:'py', chile:'cl', bolivia:'bo', venezuela:'ve',
+    japan:'jp', southkorea:'kr', korea:'kr', australia:'au', qatar:'qa', uae:'ae',
+    unitedarabemirates:'ae', uzbekistan:'uz', bahrain:'bh', china:'cn', panama:'pa',
+    honduras:'hn', jamaica:'jm', sweden:'se', turkey:'tr', greece:'gr', ukraine:'ua',
+    romania:'ro', hungary:'hu', czechia:'cz', slovakia:'sk', slovenia:'si', capeverde:'cv',
+    drcongo:'cd', mali:'ml', kenya:'ke', ireland:'ie'
+  };
+
+  // Returns a flag <img> (works on every OS, unlike flag emoji) or, for an
+  // unknown team, a small lettered chip. Used inline anywhere a flag appears.
   const getFlagEmoji = (country) => {
-    const flags = {
-      france: '🇫🇷', senegal: '🇸🇳', iraq: '🇮🇶', norway: '🇳🇴',
-      argentina: '🇦🇷', algeria: '🇩🇿', austria: '🇦🇹', jordan: '🇯🇴',
-      belgium: '🇧🇪', egypt: '🇪🇬', saudiarabia: '🇸🇦', uruguay: '🇺🇾',
-      iran: '🇮🇷', newzealand: '🇳🇿'
-    };
-    return flags[normalizeTeamName(country)] || '🏳️';
+    const iso = TEAM_ISO[normalizeTeamName(country)];
+    if (iso) {
+      return <img
+        src={`https://flagcdn.com/h20/${iso}.png`}
+        srcSet={`https://flagcdn.com/h40/${iso}.png 2x`}
+        alt="" title={country}
+        className="inline-block h-[1em] w-auto rounded-[2px] shadow-sm align-[-0.15em]" />;
+    }
+    const code = String(country || '').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || '?';
+    return <span title={country}
+      className="inline-flex items-center justify-center h-[1em] min-w-[1.5em] px-1 rounded-[2px] bg-gray-300 text-gray-600 text-[0.5em] font-bold leading-none align-[-0.15em]">{code}</span>;
   };
 
   const calculatePoints = (pred, real) => {
@@ -736,7 +761,10 @@
 
       let cleanText = rawText.replace(/(\d)(\d\.)/g, '$1 $2');
       cleanText = cleanText.replace(/(\d)([a-zA-Z])/g, '$1 $2');
-      const regex = /([a-zA-Z\s]+?)\s+v(?:s|)\.?\s+([a-zA-Z\s]+?)[\s-]+(\d+)[\s-]+(\d+)/gi;
+      // Team separator: either a "vs" token (v / vs / v.s. / versus, whitespace-
+      // bounded) OR a dash (e.g. "Austria - Jordan"). Scores follow, dash/space
+      // separated. Teams are letters/spaces; scores are digits.
+      const regex = /([a-zA-Z][a-zA-Z\s]*?)(?:\s+(?:v\.?\s*s\.?|versus)\s+|\s*[-–—]\s*)([a-zA-Z][a-zA-Z\s]*?)[\s\-–—]+(\d+)[\s\-–—]+(\d+)/gi;
 
       const results = [];
       let match;
