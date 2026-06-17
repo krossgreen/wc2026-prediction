@@ -463,6 +463,12 @@
     const leaderPoints = (leaderboard[0] && leaderboard[0].totalPoints) || 0;
     const [exporting, setExporting] = useState(false);
 
+    const totalPicks   = leaderboard.reduce((s, u) => s + u.completedPicks, 0);
+    const totalExact   = leaderboard.reduce((s, u) => s + u.exactMatches, 0);
+    const totalOutcome = leaderboard.reduce((s, u) => s + u.correctOutcomes, 0);
+    const bestPicker   = leaderboard.reduce((best, u) => u.exactMatches > (best ? best.exactMatches : -1) ? u : best, null);
+    const headerDate   = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
     // Save the standings panel as a PNG to share in the group chat.
     // Before capturing we (1) freeze animations and hide the leader's foil
     // sweep so we get a clean static frame, and (2) zero the panel's margin —
@@ -526,6 +532,10 @@
           <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#222 1px, transparent 1px), linear-gradient(90deg, #222 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
           <div className="relative z-10 flex flex-col gap-4">
+            {/* Identity header — visible in the exported image */}
+            <div className="text-center font-oswald text-[#666] text-xs md:text-sm tracking-[0.2em] uppercase">
+              TexAus &middot; World Cup 2026 &middot; {headerDate}
+            </div>
             <div className="flex justify-center items-start">
               <h2 className="text-[#D4AF37] text-4xl uppercase text-center tracking-widest border-b-2 border-[#D4AF37]/30 pb-4 mb-4 flex items-center justify-center gap-3 drop-shadow-[0_0_8px_rgba(212,175,55,0.8)]">
                 <Crown className="text-[#D4AF37]" size={36} />
@@ -588,9 +598,11 @@
 
             <div className="space-y-2 text-xl md:text-3xl">
               {leaderboard.map((user, idx) => (
-                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors relative overflow-hidden ${idx === 0 ? 'leader-foil bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300' : idx === 2 ? 'bg-amber-950/40 text-amber-600' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
+                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors relative overflow-hidden ${idx === 0 ? 'leader-foil bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300 border border-gray-400/25 shadow-[0_0_10px_rgba(192,192,192,0.08)]' : idx === 2 ? 'bg-amber-950/40 text-amber-600 border border-amber-800/40' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
                   <div className="col-span-1 flex flex-col items-center justify-center leading-none gap-0.5">
                     {idx === 0 && <Crown className="leader-crown text-[#D4AF37]" size={18} />}
+                    {idx === 1 && <Medal className="text-gray-400" size={14} />}
+                    {idx === 2 && <Medal className="text-amber-700" size={14} />}
                     <span>{idx + 1}</span>
                     {user.movement != null && (
                       <span
@@ -617,7 +629,7 @@
                   <div className="col-span-1 text-center text-gray-300 bg-gray-900/40 py-1 rounded">{user.completedPicks}</div>
                   <div className="col-span-1 text-center text-green-400 bg-green-900/20 py-1 rounded">{user.exactMatches}</div>
                   <div className="col-span-1 text-center text-blue-400 bg-blue-900/20 py-1 rounded">{user.correctOutcomes}</div>
-                  <div className={`col-span-2 text-center drop-shadow-[0_0_5px_rgba(212,175,55,0.5)] ${idx === 0 ? 'text-4xl md:text-5xl text-amber-300 font-black' : 'text-3xl md:text-4xl text-amber-400'}`}>{user.totalPoints}</div>
+                  <div className={`col-span-2 text-center ${idx === 0 ? 'text-4xl md:text-5xl text-amber-300 font-black drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]' : idx === 1 ? 'text-3xl md:text-4xl text-gray-300 drop-shadow-[0_0_4px_rgba(200,200,200,0.3)]' : idx === 2 ? 'text-3xl md:text-4xl text-amber-700 drop-shadow-[0_0_4px_rgba(160,80,0,0.3)]' : 'text-3xl md:text-4xl text-amber-400'}`}>{user.totalPoints}</div>
 
                   {/* gap-to-leader bar (width = points relative to the leader) */}
                   {leaderPoints > 0 && user.totalPoints > 0 && (
@@ -630,6 +642,23 @@
                 </div>
               ))}
             </div>
+
+            {/* Stats summary bar */}
+            {totalPicks > 0 && (
+              <div className="mt-2 pt-3 border-t border-[#2a2a2a] flex flex-wrap justify-center gap-x-4 gap-y-1 font-oswald text-xs md:text-sm tracking-wider">
+                <span className="text-[#555]">{totalPicks} <span className="text-[#444]">picks</span></span>
+                <span className="text-[#444]">·</span>
+                <span className="text-green-700">{totalExact} <span className="text-[#555]">exact</span></span>
+                <span className="text-[#444]">·</span>
+                <span className="text-blue-800">{totalOutcome} <span className="text-[#555]">correct</span></span>
+                {bestPicker && bestPicker.exactMatches > 0 && (
+                  <>
+                    <span className="text-[#444]">·</span>
+                    <span className="text-[#555]">top scorer <span className="text-[#D4AF37]/70">{bestPicker.name}</span></span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -812,7 +841,7 @@
       <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300">
         <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-[#D4AF37]">
           <h2 className="text-2xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] mb-6 flex items-center gap-2">
-            <Activity /> Open a Sticker Pack (Paste Picks)
+            <Activity /> Paste Picks
           </h2>
 
           {/* User Selection & Creation */}
