@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TexAus World Cup 2026 Predictions</title>
+
+  <!--
+    NO-BUILD RUNNER
+    ----------------
+    This file runs the React component with zero install — just open it.
+    It pulls four libraries from CDNs (needs an internet connection):
+      1. Tailwind  (the utility classes used everywhere)
+      2. React + ReactDOM
+      3. lucide (the icon data), exposed as the global `lucide`. We build the
+         icons into React components ourselves — the `lucide-react` UMD build
+         does not expose its icons usably, but the vanilla `lucide` UMD does.
+      4. Babel standalone, which compiles the JSX in your browser at load time
+
+    The whole app lives in this single file. The two `import` lines a normal
+    React project would use are replaced by the "wiring" block below (pulling
+    React hooks off the global, and building the lucide icons into components),
+    plus a render call at the very bottom.
+
+    Heads-up: this app keeps data only in memory (it resets on refresh). Use the
+    Backup tab (Export / Import JSON) to save and restore a tournament.
+  -->
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/lucide@0.379.0/dist/umd/lucide.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <style> html, body, #root { min-height: 100%; margin: 0; } </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+  /* ---- wiring: replaces the two `import` lines from App.jsx ---- */
+  const { useState, useEffect, useMemo, useRef } = React;
+
+  // The lucide icons. The vanilla `lucide` UMD exposes every icon as an SVG
+  // node array like ["svg", attrs, [ ["path", {d:"..."}], ... ]]. We turn that
+  // into a small React component so the existing <Trophy size=.. className=.. />
+  // call sites work unchanged. Any missing icon degrades to a harmless no-op.
+  const _toCamel = (k) => k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  function _renderNode(node, key) {
+    const tag = node[0], attrs = node[1] || {}, children = node[2] || [];
+    const props = { key };
+    for (const k in attrs) props[_toCamel(k)] = attrs[k];
+    const kids = children.map((c, i) => _renderNode(c, i));
+    return React.createElement(tag, props, kids.length ? kids : undefined);
+  }
+  function _makeIcon(name) {
+    const node = window.lucide && window.lucide[name];
+    if (!node) return () => null;
+    const baseAttrs = node[1] || {}, children = node[2] || [];
+    return function LucideIcon(props) {
+      props = props || {};
+      const svgProps = {};
+      for (const k in baseAttrs) svgProps[_toCamel(k)] = baseAttrs[k];
+      if (props.size != null) { svgProps.width = props.size; svgProps.height = props.size; }
+      if (props.className) svgProps.className = props.className;
+      if (props.style) svgProps.style = props.style;
+      svgProps['aria-hidden'] = 'true';
+      return React.createElement('svg', svgProps, children.map((c, i) => _renderNode(c, i)));
+    };
+  }
+  const Trophy = _makeIcon('Trophy'), Plus = _makeIcon('Plus'), Save = _makeIcon('Save'),
+    Activity = _makeIcon('Activity'), CheckCircle = _makeIcon('CheckCircle'),
+    ShieldAlert = _makeIcon('ShieldAlert'), Award = _makeIcon('Award'), Star = _makeIcon('Star'),
+    Download = _makeIcon('Download'), Upload = _makeIcon('Upload'), Crown = _makeIcon('Crown'),
+    Medal = _makeIcon('Medal'), Users = _makeIcon('Users'),
+    ToggleLeft = _makeIcon('ToggleLeft'), ToggleRight = _makeIcon('ToggleRight');
+
+  // --- CSS Enhancements (Foil, Fonts, Tickets, Ledger, Metal) ---
+  const customStyles = `
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Oswald:wght@400;700&family=VT323&display=swap');
+
+    /* Typography Classes */
+    .font-oswald { font-family: 'Oswald', sans-serif; }
+    .font-vt323 { font-family: 'VT323', monospace; letter-spacing: 1px; }
+    .font-caveat { font-family: 'Caveat', cursive; }
+
+    /* Holographic Foil */
+    @keyframes foil-shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+    .foil-card {
+      position: relative;
+      overflow: hidden;
+      border-color: #D4AF37 !important;
+    }
+    .foil-card::after {
+      content: '';
+      position: absolute;
+      top: 0; right: 0; bottom: 0; left: 0;
+      background: linear-gradient(
+        105deg,
+        transparent 20%,
+        rgba(255, 215, 0, 0.4) 25%,
+        rgba(255, 255, 255, 0.8) 30%,
+        rgba(255, 215, 0, 0.4) 35%,
+        transparent 40%
+      );
+      background-size: 200% auto;
+      animation: foil-shimmer 3s infinite linear;
+      pointer-events: none;
+      z-index: 10;
+      mix-blend-mode: color-dodge;
+    }
+
+    /* Perforated Vintage Ticket */
+    .vintage-ticket {
+      position: relative;
+      background-color: #fff;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .vintage-ticket::before, .vintage-ticket::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 14px;
+      background-image: radial-gradient(circle at center, #FDFBF7 5px, transparent 6px);
+      background-size: 100% 18px;
+      z-index: 10;
+    }
+    .vintage-ticket::before { left: -7px; }
+    .vintage-ticket::after { right: -7px; }
+
+    /* Metallic Podium Texture */
+    .metal-texture {
+      position: relative;
+      overflow: hidden;
+    }
+    .metal-texture::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.15'/%3E%3C/svg%3E");
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* Scout Ledger Textarea */
+    .scout-ledger {
+      background-color: #f4f1ea;
+      background-image: repeating-linear-gradient(transparent, transparent 31px, #a3c4f3 31px, #a3c4f3 32px);
+      line-height: 32px;
+      padding-top: 6px;
+      color: #0b1f38;
+    }
+  `;
+
+  // --- Helper Functions ---
+  const normalizeTeamName = (name) => {
+    return name.toLowerCase().replace(/[^a-z]/g, '');
+  };
+
+  const getFlagEmoji = (country) => {
+    const flags = {
+      france: '🇫🇷', senegal: '🇸🇳', iraq: '🇮🇶', norway: '🇳🇴',
+      argentina: '🇦🇷', algeria: '🇩🇿', austria: '🇦🇹', jordan: '🇯🇴',
+      belgium: '🇧🇪', egypt: '🇪🇬', saudiarabia: '🇸🇦', uruguay: '🇺🇾',
+      iran: '🇮🇷', newzealand: '🇳🇿'
+    };
+    return flags[normalizeTeamName(country)] || '🏳️';
+  };
+
+  const calculatePoints = (pred, real) => {
+    if (!real) return 0;
+    if (pred.score1 === real.score1 && pred.score2 === real.score2) return 3;
+    const predDiff = pred.score1 - pred.score2;
+    const realDiff = real.score1 - real.score2;
+    if (Math.sign(predDiff) === Math.sign(realDiff)) return 1;
+    return 0;
+  };
+
+  // --- Initial Mock Data ---
+  const initialUsers = [
+    { id: 'u1', name: 'User 1' },
+    { id: 'u2', name: 'User 2' },
+    { id: 'u3', name: 'User 3' }
+  ];
+
+  const initialPredictions = [
+    { id: 'p1', userId: 'u1', team1: 'France', team2: 'Senegal', score1: 3, score2: 1 },
+    { id: 'p2', userId: 'u1', team1: 'Iraq', team2: 'Norway', score1: 1, score2: 2 },
+    { id: 'p3', userId: 'u1', team1: 'Argentina', team2: 'Algeria', score1: 2, score2: 1 },
+    { id: 'p4', userId: 'u1', team1: 'Austria', team2: 'Jordan', score1: 2, score2: 2 },
+
+    { id: 'p5', userId: 'u2', team1: 'Belgium', team2: 'Egypt', score1: 2, score2: 1 },
+    { id: 'p6', userId: 'u2', team1: 'Saudi Arabia', team2: 'Uruguay', score1: 0, score2: 2 },
+    { id: 'p7', userId: 'u2', team1: 'Iran', team2: 'New Zealand', score1: 3, score2: 0 },
+
+    { id: 'p8', userId: 'u3', team1: 'Belgium', team2: 'Egypt', score1: 3, score2: 0 },
+    { id: 'p9', userId: 'u3', team1: 'Saudi Arabia', team2: 'Uruguay', score1: 0, score2: 1 },
+    { id: 'p10', userId: 'u3', team1: 'Iran', team2: 'New Zealand', score1: 1, score2: 1 }
+  ];
+
+  const initialRealResults = [
+    { id: 'r1', team1: 'Belgium', team2: 'Egypt', score1: 2, score2: 1 },
+    { id: 'r2', team1: 'Saudi Arabia', team2: 'Uruguay', score1: 0, score2: 2 }
+  ];
+
+  function App() {
+    const [users, setUsers] = useState(initialUsers);
+    const [predictions, setPredictions] = useState(initialPredictions);
+    const [realResults, setRealResults] = useState(initialRealResults);
+    const [activeTab, setActiveTab] = useState('leaderboard');
+    const [showBadges, setShowBadges] = useState(false);
+
+    // --- Score Calculation ---
+    const leaderboard = useMemo(() => {
+      const stats = users.map(user => {
+        let totalPoints = 0;
+        let exactMatches = 0;
+        let correctOutcomes = 0;
+        let parkTheBusCount = 0;
+        let completedPicks = 0;
+        let form = [];
+
+        const userPreds = predictions.filter(p => p.userId === user.id);
+        const chronologicalResults = [...realResults];
+
+        chronologicalResults.forEach(real => {
+          const normT1 = normalizeTeamName(real.team1);
+          const normT2 = normalizeTeamName(real.team2);
+
+          const pred = userPreds.find(p =>
+            normalizeTeamName(p.team1) === normT1 && normalizeTeamName(p.team2) === normT2
+          );
+
+          if (pred) {
+            completedPicks++;
+            const pts = calculatePoints(pred, real);
+            totalPoints += pts;
+            if (pts === 3) exactMatches += 1;
+            if (pts === 1) correctOutcomes += 1;
+            form.push(pts);
+
+            if ((pred.score1 === 0 && pred.score2 === 0) ||
+                (pred.score1 === 1 && pred.score2 === 0) ||
+                (pred.score1 === 0 && pred.score2 === 1)) {
+              parkTheBusCount++;
+            }
+          }
+        });
+
+        let isOracle = false;
+        let streak = 0;
+        for (let pt of form) {
+          if (pt === 3) { streak++; if(streak>=3) isOracle=true; }
+          else streak = 0;
+        }
+
+        return { ...user, totalPoints, exactMatches, correctOutcomes, userPreds, form: form.slice(-5), parkTheBusCount, isOracle, completedPicks };
+      });
+
+      const maxPark = Math.max(0, ...stats.map(s => s.parkTheBusCount));
+      const eligibleWildcards = stats.filter(s => s.exactMatches > 0);
+      const minPts = eligibleWildcards.length > 0 ? Math.min(...eligibleWildcards.map(s => s.totalPoints)) : -1;
+
+      stats.forEach(s => {
+        s.badges = [];
+        if (s.isOracle) s.badges.push({ icon: '🔮', title: 'The Oracle (3 Exact Scores in a row)' });
+        if (maxPark > 0 && s.parkTheBusCount === maxPark) s.badges.push({ icon: '🛡️', title: 'Park the Bus (Most 0-0/1-0 picks)' });
+        if (s.exactMatches > 0 && s.totalPoints === minPts) s.badges.push({ icon: '🎲', title: 'Wildcard (Hits upsets but low average)' });
+      });
+
+      return stats.sort((a, b) => {
+        if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints; // PTS (more)
+        if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
+        if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
+        return b.correctOutcomes - a.correctOutcomes; // OUTCOME (more)
+      });
+    }, [users, predictions, realResults]);
+
+    // --- Main Render ---
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] text-[#333] font-sans selection:bg-[#D4AF37] selection:text-white">
+        <style>{customStyles}</style>
+
+        {/* Header */}
+        <header className="bg-[#1B4D3E] text-white p-6 shadow-md border-b-8 border-[#D4AF37]">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Trophy size={40} className="text-[#D4AF37]" />
+              <div>
+                <h1 className="font-oswald text-3xl md:text-4xl font-bold uppercase tracking-wide text-[#FDFBF7]">
+                  TexAus World Cup 2026 Predictions
+                </h1>
+              </div>
+            </div>
+
+            <nav className="flex justify-center flex-wrap gap-2 sm:gap-3 w-full md:w-auto mt-4 md:mt-0 font-oswald">
+              {[
+                { id: 'leaderboard', label: 'Scoreboard' },
+                { id: 'user-picks', label: 'Player Picks' },
+                { id: 'predictions', label: 'Paste Picks' },
+                { id: 'admin', label: 'Results' },
+                { id: 'backup', label: 'Backup' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 sm:px-5 py-2 text-sm sm:text-base font-bold uppercase tracking-widest rounded-full border-2 transition-all duration-200 ${
+                    activeTab === tab.id
+                      ? 'bg-[#D4AF37] text-[#1B4D3E] border-[#D4AF37] shadow-md scale-105'
+                      : 'bg-[#0d2a21]/60 text-gray-300 border-transparent hover:bg-[#0d2a21] hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+          </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="max-w-6xl mx-auto p-6 min-h-[80vh]">
+          {activeTab === 'leaderboard' && (
+            <LeaderboardView leaderboard={leaderboard} realResults={realResults} showBadges={showBadges} setShowBadges={setShowBadges} />
+          )}
+          {activeTab === 'user-picks' && (
+            <UserPicksView
+              users={users}
+              predictions={predictions}
+              realResults={realResults}
+            />
+          )}
+          {activeTab === 'predictions' && (
+            <PredictionsView
+              users={users}
+              setUsers={setUsers}
+              setPredictions={setPredictions}
+            />
+          )}
+          {activeTab === 'admin' && (
+            <AdminView
+              realResults={realResults}
+              setRealResults={setRealResults}
+              predictions={predictions}
+            />
+          )}
+          {activeTab === 'backup' && (
+            <BackupView
+              users={users}
+              setUsers={setUsers}
+              predictions={predictions}
+              setPredictions={setPredictions}
+              realResults={realResults}
+              setRealResults={setRealResults}
+            />
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  // --- VIEWS ---
+
+  function LeaderboardView({ leaderboard, realResults, showBadges, setShowBadges }) {
+    const top3 = leaderboard.slice(0, 3);
+
+    return (
+      <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
+
+        <div className="flex justify-end gap-4 mb-2">
+          <button
+            onClick={() => setShowBadges(!showBadges)}
+            className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#1B4D3E] transition-colors bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-200"
+          >
+            {showBadges ? <ToggleRight className="text-[#D4AF37]" size={20} /> : <ToggleLeft size={20} />}
+            Player Badges
+          </button>
+        </div>
+
+        {/* Stadium Scoreboard */}
+        <div className="bg-[#111] border-8 border-[#333] rounded-lg p-6 shadow-2xl relative overflow-hidden font-vt323">
+          {/* Subtle grid pattern background for scoreboard */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#222 1px, transparent 1px), linear-gradient(90deg, #222 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+
+          <div className="relative z-10 flex flex-col gap-4">
+            <div className="flex justify-center items-start">
+              <h2 className="text-[#D4AF37] text-4xl uppercase text-center tracking-widest border-b-2 border-[#D4AF37]/30 pb-4 mb-4 flex items-center justify-center gap-3 drop-shadow-[0_0_8px_rgba(212,175,55,0.8)]">
+                <Crown className="text-[#D4AF37]" size={36} />
+                Global Rankings
+                <Crown className="text-[#D4AF37]" size={36} />
+              </h2>
+            </div>
+
+            {/* TOP 3 PODIUM */}
+            {top3.length > 0 && (
+              <div className="flex justify-center items-end gap-2 sm:gap-6 mb-8 mt-4 h-48 font-oswald tracking-wide">
+                {/* 2nd Place */}
+                {top3[1] && (
+                  <div className="flex flex-col items-center animate-in slide-in-from-bottom duration-500 delay-100">
+                    <div className="bg-gray-300 text-black font-black px-4 py-2 rounded-t-lg text-lg flex flex-col items-center shadow-md">
+                       <Medal size={24} className="mb-1 text-gray-600"/>
+                       {top3[1].name}
+                    </div>
+                    <div className="metal-texture bg-gradient-to-b from-gray-200 via-gray-400 to-gray-600 w-24 h-24 sm:w-32 flex items-center justify-center text-white font-black text-3xl border-t-4 border-white shadow-[inset_0_3px_0_rgba(255,255,255,0.8),0_10px_15px_-3px_rgba(0,0,0,0.6)]">
+                      {top3[1].totalPoints}pts
+                    </div>
+                  </div>
+                )}
+                {/* 1st Place */}
+                {top3[0] && (
+                  <div className="flex flex-col items-center animate-in slide-in-from-bottom duration-500 z-10">
+                    <div className="bg-[#D4AF37] text-black font-black px-6 py-3 rounded-t-lg text-xl flex flex-col items-center shadow-[0_0_15px_rgba(212,175,55,0.6)]">
+                       <Crown size={32} className="mb-1 text-amber-900"/>
+                       {top3[0].name}
+                    </div>
+                    <div className="metal-texture bg-gradient-to-b from-yellow-300 via-amber-500 to-amber-700 w-28 h-32 sm:w-40 flex items-center justify-center text-white font-black text-5xl border-t-4 border-yellow-100 shadow-[inset_0_3px_0_rgba(255,255,255,0.8),0_10px_15px_-3px_rgba(0,0,0,0.8)]">
+                      {top3[0].totalPoints}pts
+                    </div>
+                  </div>
+                )}
+                {/* 3rd Place */}
+                {top3[2] && (
+                  <div className="flex flex-col items-center animate-in slide-in-from-bottom duration-500 delay-200">
+                    <div className="bg-amber-700 text-white font-black px-4 py-2 rounded-t-lg text-lg flex flex-col items-center shadow-md">
+                       <Medal size={24} className="mb-1 text-amber-300"/>
+                       {top3[2].name}
+                    </div>
+                    <div className="metal-texture bg-gradient-to-b from-orange-300 via-amber-700 to-amber-900 w-24 h-20 sm:w-32 flex items-center justify-center text-white font-black text-3xl border-t-4 border-orange-200 shadow-[inset_0_3px_0_rgba(255,255,255,0.6),0_10px_15px_-3px_rgba(0,0,0,0.6)]">
+                      {top3[2].totalPoints}pts
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="grid grid-cols-12 gap-1 md:gap-2 text-gray-500 text-lg md:text-2xl uppercase mb-2 border-b border-[#333] pb-2">
+              <div className="col-span-1 text-center">Pos</div>
+              <div className="col-span-4">Player</div>
+              <div className="col-span-2 text-center" title="Form Guide (Last 5)">Form</div>
+              <div className="col-span-1 text-center" title="Completed Predictions">Picks</div>
+              <div className="col-span-1 text-center" title="Exact Score (3pts)">Exact</div>
+              <div className="col-span-2 text-center" title="Correct Outcome (1pt)">Outcome</div>
+              <div className="col-span-1 text-center text-amber-500">Pts</div>
+            </div>
+
+            <div className="space-y-2 text-xl md:text-3xl">
+              {leaderboard.map((user, idx) => (
+                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors ${idx === 0 ? 'bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300' : idx === 2 ? 'bg-amber-950/40 text-amber-600' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
+                  <div className="col-span-1 text-center">{idx + 1}</div>
+                  <div className="col-span-4 flex flex-wrap md:flex-nowrap items-center gap-1 md:gap-2">
+                    <span className="truncate">{user.name}</span>
+                    <div className="flex font-sans">
+                      {showBadges && user.badges.map((b, i) => (
+                        <span key={i} title={b.title} className="text-base md:text-xl drop-shadow-md cursor-help">{b.icon}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="col-span-2 flex justify-center gap-1 md:gap-2 items-center">
+                    {user.form.length > 0 ? user.form.map((res, i) => (
+                      <span key={i} title={res === 3 ? 'Exact Score (3pt)' : res === 1 ? 'Outcome (1pt)' : 'Miss (0pt)'} className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${res === 3 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : res === 1 ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-red-600 border border-red-800'}`}></span>
+                    )) : <span className="text-lg text-gray-600">-</span>}
+                  </div>
+                  <div className="col-span-1 text-center text-gray-300 bg-gray-900/40 py-1 rounded mx-0.5 md:mx-1">{user.completedPicks}</div>
+                  <div className="col-span-1 text-center text-green-400 bg-green-900/20 py-1 rounded mx-0.5 md:mx-1">{user.exactMatches}</div>
+                  <div className="col-span-2 text-center text-blue-400 bg-blue-900/20 py-1 rounded mx-0.5 md:mx-1">{user.correctOutcomes}</div>
+                  <div className="col-span-1 text-center text-3xl md:text-4xl text-amber-400 drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">{user.totalPoints}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function UserPicksView({ users, predictions, realResults }) {
+    const [selectedUser, setSelectedUser] = useState(users[0]?.id || null);
+
+    const activeUser = users.find(u => u.id === selectedUser);
+    const userPreds = predictions.filter(p => p.userId === selectedUser);
+
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
+
+        {/* Player Selector Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide font-oswald">
+          {users.map(u => (
+            <button
+              key={u.id}
+              onClick={() => setSelectedUser(u.id)}
+              className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap tracking-wider transition-all shadow-sm ${
+                selectedUser === u.id
+                  ? 'bg-[#1B4D3E] text-white border-2 border-[#1B4D3E]'
+                  : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-[#D4AF37] hover:text-[#1B4D3E]'
+              }`}
+            >
+              {u.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Predictions List */}
+        {activeUser && (
+          <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-[#e5e7eb]">
+            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+              <h2 className="text-2xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] flex items-center gap-2">
+                <CheckCircle className="text-[#D4AF37]" />
+                {activeUser.name}'s Match Tickets
+              </h2>
+              <div className="bg-gray-100 text-gray-600 font-bold px-4 py-1.5 rounded-full text-sm">
+                {userPreds.length} Tickets
+              </div>
+            </div>
+
+            {userPreds.length === 0 ? (
+              <div className="flex justify-center items-center py-12 animate-in zoom-in-95">
+                <div className="w-48 h-64 bg-[#f0eee9] border-4 border-dashed border-[#d1ccc0] flex flex-col justify-center items-center rounded-sm relative shadow-inner rotate-1">
+                  <div className="absolute top-2 right-2 text-xs font-bold text-[#b8b3a5] bg-[#e1dcd0] px-2 py-0.5 rounded-full">#?</div>
+                  <div className="text-6xl text-[#d1ccc0] opacity-50 mb-4 drop-shadow-sm">🏆</div>
+                  <p className="text-center font-bold text-[#a09c8f] text-sm px-4 leading-tight">
+                    Sticker missing!<br/><span className="text-xs font-normal">Paste text to open a pack.</span>
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userPreds.map(pred => {
+                  const normT1 = normalizeTeamName(pred.team1);
+                  const normT2 = normalizeTeamName(pred.team2);
+                  const real = realResults.find(r => normalizeTeamName(r.team1) === normT1 && normalizeTeamName(r.team2) === normT2);
+                  const pts = calculatePoints(pred, real);
+
+                  return (
+                    <div key={pred.id} className="vintage-ticket hover:-rotate-1 transition-transform duration-200 p-3 sm:p-4 border border-[#e5e7eb] flex flex-wrap sm:flex-nowrap justify-center sm:justify-between items-center gap-2 sm:gap-4">
+                      {/* Home Team */}
+                      <div className="flex-1 flex justify-end items-center gap-2 sm:gap-3 min-w-[100px]">
+                        <span className="font-bold text-sm sm:text-lg text-right text-gray-800">{pred.team1}</span>
+                        <span className="text-lg sm:text-3xl drop-shadow-sm">{getFlagEmoji(pred.team1)}</span>
+                      </div>
+
+                      {/* Score Box */}
+                      <div className="flex flex-col items-center px-2 sm:px-4 w-28 sm:w-36 z-10">
+                        <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
+                          {pred.score1} - {pred.score2}
+                        </div>
+                        {real ? (
+                          <div className="text-[10px] sm:text-xs text-gray-500 mt-1.5 font-bold uppercase tracking-wider text-center">
+                            Actual: {real.score1}-{real.score2}
+                          </div>
+                        ) : (
+                          <div className="text-[9px] sm:text-[10px] text-[#D4AF37] mt-1.5 font-bold uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded text-center border border-amber-200">
+                            Kickoff Pending
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Away Team */}
+                      <div className="flex-1 flex justify-start items-center gap-2 sm:gap-3 min-w-[100px]">
+                        <span className="text-lg sm:text-3xl drop-shadow-sm">{getFlagEmoji(pred.team2)}</span>
+                        <span className="font-bold text-sm sm:text-lg text-gray-800">{pred.team2}</span>
+                      </div>
+
+                      {/* Points Result */}
+                      <div className="w-auto sm:w-16 flex justify-end absolute sm:relative top-2 right-2 sm:top-auto sm:right-auto z-10">
+                        {real && (
+                          <span className={`font-black text-sm sm:text-lg px-2 sm:px-3 py-1 rounded-md shadow-sm border ${
+                            pts === 3 ? 'bg-green-100 text-green-700 border-green-200' :
+                            pts === 1 ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                            'bg-red-50 text-red-500 border-red-100'
+                          }`}>
+                            +{pts}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function PredictionsView({ users, setUsers, setPredictions }) {
+    const [selectedUserId, setSelectedUserId] = useState(users[0]?.id || '');
+    const [newUserName, setNewUserName] = useState('');
+    const [rawText, setRawText] = useState('');
+    const [parsedResults, setParsedResults] = useState([]);
+
+    // Real-time parsing logic
+    useEffect(() => {
+      if (!rawText.trim()) {
+        setParsedResults([]);
+        return;
+      }
+
+      let cleanText = rawText.replace(/(\d)(\d\.)/g, '$1 $2');
+      cleanText = cleanText.replace(/(\d)([a-zA-Z])/g, '$1 $2');
+      const regex = /([a-zA-Z\s]+?)\s+v(?:s|)\.?\s+([a-zA-Z\s]+?)[\s-]+(\d+)[\s-]+(\d+)/gi;
+
+      const results = [];
+      let match;
+      while ((match = regex.exec(cleanText)) !== null) {
+        let team1 = match[1].trim();
+        let team2 = match[2].trim();
+        team1 = team1.replace(/^[\d.\s]+/, '');
+
+        results.push({
+          team1,
+          team2,
+          score1: parseInt(match[3], 10),
+          score2: parseInt(match[4], 10)
+        });
+      }
+      setParsedResults(results);
+    }, [rawText]);
+
+    const handleAddUser = (e) => {
+      e.preventDefault();
+      if (!newUserName.trim()) return;
+      const newUser = { id: `u${Date.now()}`, name: newUserName.trim() };
+      setUsers([...users, newUser]);
+      setSelectedUserId(newUser.id);
+      setNewUserName('');
+    };
+
+    const handleSavePicks = () => {
+      if (parsedResults.length === 0 || !selectedUserId) return;
+      const newPreds = parsedResults.map(p => ({
+        id: `p${Date.now()}_${Math.random()}`,
+        userId: selectedUserId,
+        ...p
+      }));
+      setPredictions(prev => [...prev, ...newPreds]);
+      setRawText('');
+      alert("Stickers printed and saved successfully!");
+    };
+
+    const loadDemoText = () => {
+      setRawText("Belgium Vs Egypt - 2 - 1\n2. Saudi Arabia vs Uruguay - 0 - 2\n3. Iran vs New Zealand - 1 - 1");
+    };
+
+    return (
+      <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300">
+        <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-[#D4AF37]">
+          <h2 className="text-2xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] mb-6 flex items-center gap-2">
+            <Activity /> Open a Sticker Pack (Paste Picks)
+          </h2>
+
+          {/* User Selection & Creation */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6 p-4 bg-[#FDFBF7] rounded-md border border-gray-200">
+            <div className="flex-1">
+              <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Select Collector</label>
+              <select
+                className="w-full p-2 border border-gray-300 rounded font-bold text-gray-700 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+              >
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Or Add New Player</label>
+              <form onSubmit={handleAddUser} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Name..."
+                  className="w-full p-2 border border-gray-300 rounded outline-none focus:border-[#D4AF37] font-bold"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                />
+                <button type="submit" className="bg-[#1B4D3E] text-white p-2 rounded hover:bg-[#143a2e] transition-colors">
+                  <Plus size={20} />
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Text Area */}
+          <div className="mb-4 relative">
+            <div className="flex justify-between items-end mb-2">
+              <label className="block text-sm font-bold text-gray-700">Scout's Notebook (Paste Chat Message)</label>
+              <button onClick={loadDemoText} className="text-xs text-[#D4AF37] font-bold underline hover:text-amber-600">
+                Load Demo Text
+              </button>
+            </div>
+
+            <div className="relative shadow-inner rounded overflow-hidden border-2 border-gray-300">
+              {/* The vertical red margin line for the notebook */}
+              <div className="absolute top-0 bottom-0 left-12 w-0.5 bg-red-400/50 z-10 pointer-events-none"></div>
+              <textarea
+                className="scout-ledger font-caveat text-2xl w-full h-48 pl-16 pr-4 outline-none focus:border-[#1B4D3E]"
+                placeholder="e.g. France v.s. Senegal - 3 - 1&#10;Iraq v.s. Norway - 1 - 2"
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+              ></textarea>
+            </div>
+          </div>
+
+          {/* Live Preview */}
+          {rawText.trim() && (
+            <div className="mt-6 bg-[#f9f9f9] p-4 rounded-lg border border-dashed border-gray-300">
+              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <CheckCircle size={16} className="text-green-500" /> Parsed Ticket Preview
+              </h3>
+
+              {parsedResults.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  {parsedResults.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center bg-white p-3 rounded shadow-sm border border-gray-200">
+                      <span className="font-bold flex items-center gap-2">
+                        {getFlagEmoji(p.team1)} {p.team1}
+                      </span>
+                      <span className="bg-[#1B4D3E] text-white font-vt323 text-xl px-3 py-1 rounded">
+                        {p.score1} - {p.score2}
+                      </span>
+                      <span className="font-bold flex items-center gap-2">
+                        {p.team2} {getFlagEmoji(p.team2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-400 py-4 flex flex-col items-center gap-2">
+                  <ShieldAlert size={24} />
+                  <p>Could not find any matches in that text. Check the format!</p>
+                </div>
+              )}
+
+              <button
+                onClick={handleSavePicks}
+                disabled={parsedResults.length === 0}
+                className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-[#1B4D3E] font-oswald text-lg uppercase tracking-widest py-3 rounded hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
+              >
+                <Save size={20} /> Print {parsedResults.length} Tickets to Album
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function AdminView({ realResults, setRealResults, predictions }) {
+    const [t1, setT1] = useState('');
+    const [t2, setT2] = useState('');
+    const [s1, setS1] = useState('');
+    const [s2, setS2] = useState('');
+
+    const upcomingMatches = useMemo(() => {
+      const matchMap = {};
+      predictions.forEach(p => {
+        const normT1 = normalizeTeamName(p.team1);
+        const normT2 = normalizeTeamName(p.team2);
+        const isFinished = realResults.some(r => normalizeTeamName(r.team1) === normT1 && normalizeTeamName(r.team2) === normT2);
+
+        if (!isFinished) {
+          const key = `${p.team1} vs ${p.team2}`;
+          if (!matchMap[key]) matchMap[key] = { team1: p.team1, team2: p.team2, h:0, d:0, a:0, total:0 };
+          matchMap[key].total++;
+          if (p.score1 > p.score2) matchMap[key].h++;
+          else if (p.score1 < p.score2) matchMap[key].a++;
+          else matchMap[key].d++;
+        }
+      });
+      return Object.values(matchMap).sort((a,b) => b.total - a.total);
+    }, [predictions, realResults]);
+
+    const handleAddResult = (e) => {
+      e.preventDefault();
+      if (!t1 || !t2 || s1 === '' || s2 === '') return;
+
+      const newResult = {
+        id: `r${Date.now()}`,
+        team1: t1.trim(),
+        team2: t2.trim(),
+        score1: parseInt(s1, 10),
+        score2: parseInt(s2, 10)
+      };
+
+      const filtered = realResults.filter(r =>
+        !(normalizeTeamName(r.team1) === normalizeTeamName(t1) && normalizeTeamName(r.team2) === normalizeTeamName(t2))
+      );
+
+      setRealResults([...filtered, newResult]);
+      setT1(''); setT2(''); setS1(''); setS2('');
+    };
+
+    const removeResult = (id) => {
+      setRealResults(realResults.filter(r => r.id !== id));
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
+
+        {/* Community Consensus */}
+        <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-gray-200">
+          <h2 className="text-2xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] mb-6 flex items-center gap-2">
+            <Users /> Crowd Consensus (Upcoming Matches)
+          </h2>
+
+          {upcomingMatches.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {upcomingMatches.map((m, idx) => {
+                const hPct = Math.round((m.h / m.total) * 100);
+                const dPct = Math.round((m.d / m.total) * 100);
+                const aPct = Math.round((m.a / m.total) * 100);
+
+                return (
+                  <div key={idx} className="bg-gray-50 border border-gray-200 p-4 rounded shadow-sm">
+                    <div className="flex justify-between items-center mb-2 font-bold text-lg">
+                      <span className="flex items-center gap-2 text-gray-800">{getFlagEmoji(m.team1)} {m.team1}</span>
+                      <span className="text-gray-400 text-sm">vs</span>
+                      <span className="flex items-center gap-2 text-gray-800">{m.team2} {getFlagEmoji(m.team2)}</span>
+                    </div>
+
+                    {/* Split Bar */}
+                    <div className="w-full h-3 bg-gray-200 rounded-full flex overflow-hidden mb-2">
+                      {hPct > 0 && <div style={{ width: `${hPct}%` }} className="bg-green-500"></div>}
+                      {dPct > 0 && <div style={{ width: `${dPct}%` }} className="bg-gray-400"></div>}
+                      {aPct > 0 && <div style={{ width: `${aPct}%` }} className="bg-blue-500"></div>}
+                    </div>
+
+                    <div className="flex justify-between text-xs font-bold text-gray-500">
+                      <span className="text-green-600">{hPct}% Win</span>
+                      {dPct > 0 && <span>{dPct}% Draw</span>}
+                      <span className="text-blue-600">{aPct}% Win</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm italic">No upcoming matches with predictions found. Go paste some picks!</p>
+          )}
+        </div>
+
+        <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-gray-200">
+          <h2 className="text-2xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] mb-6 flex items-center gap-2">
+            <Award /> Official Match Referees Panel
+          </h2>
+
+          <form onSubmit={handleAddResult} className="scout-ledger p-6 rounded-lg border-2 border-gray-300 shadow-inner mb-8 relative overflow-hidden">
+             {/* Ledger Margin Line */}
+             <div className="absolute top-0 bottom-0 left-10 w-0.5 bg-red-400/50 z-10 pointer-events-none"></div>
+
+             <h3 className="text-lg font-caveat font-bold text-gray-500 mb-4 ml-8 tracking-wider">Log Official Full Time Score</h3>
+             <div className="flex flex-col md:flex-row items-center gap-4 relative z-20 pl-8">
+              <input
+                type="text" placeholder="Home Team (e.g. France)"
+                className="flex-1 w-full p-2 bg-transparent border-b-2 border-gray-400 border-dashed text-center outline-none focus:border-[#1B4D3E] font-caveat text-2xl font-bold"
+                value={t1} onChange={e => setT1(e.target.value)} required
+              />
+
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number" min="0" placeholder="0"
+                  className="w-16 p-2 bg-white/50 border-2 border-gray-400 rounded text-center text-3xl font-caveat font-bold outline-none focus:border-[#D4AF37]"
+                  value={s1} onChange={e => setS1(e.target.value)} required
+                />
+                <span className="text-gray-400 font-bold font-caveat text-2xl">-</span>
+                <input
+                  type="number" min="0" placeholder="0"
+                  className="w-16 p-2 bg-white/50 border-2 border-gray-400 rounded text-center text-3xl font-caveat font-bold outline-none focus:border-[#D4AF37]"
+                  value={s2} onChange={e => setS2(e.target.value)} required
+                />
+              </div>
+
+              <input
+                type="text" placeholder="Away Team (e.g. Senegal)"
+                className="flex-1 w-full p-2 bg-transparent border-b-2 border-gray-400 border-dashed text-center outline-none focus:border-[#1B4D3E] font-caveat text-2xl font-bold"
+                value={t2} onChange={e => setT2(e.target.value)} required
+              />
+
+              <button type="submit" className="w-full md:w-auto bg-[#1B4D3E] text-white px-6 py-2 rounded font-oswald uppercase tracking-widest hover:bg-[#143a2e] transition-colors shadow-md mt-2 md:mt-0">
+                Save
+              </button>
+            </div>
+          </form>
+
+          <div>
+            <h3 className="text-xl font-bold font-oswald text-gray-800 mb-4 border-b pb-2 uppercase tracking-wide">History Books (Official Results)</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-6 pt-4">
+              {realResults.map((r, index) => (
+                <div key={r.id} className="relative flex justify-between items-center bg-gray-50 border border-gray-200 p-4 rounded shadow-sm hover:shadow-md transition-shadow">
+
+                  {/* Vintage Match Order Badge */}
+                  <div className="absolute -top-3 left-4 bg-[#1B4D3E] text-[#D4AF37] text-xs font-oswald font-black uppercase tracking-widest px-3 py-1 rounded shadow-sm">
+                    Match #{index + 1}
+                  </div>
+
+                  <div className="flex-1 font-bold flex items-center justify-end gap-2 text-right text-gray-800">
+                    {r.team1} <span className="text-2xl">{getFlagEmoji(r.team1)}</span>
+                  </div>
+
+                  <div className="px-4 mx-2 bg-black text-white font-vt323 text-3xl py-1 rounded shadow-inner">
+                    {r.score1} - {r.score2}
+                  </div>
+
+                  <div className="flex-1 font-bold flex items-center gap-2 text-gray-800">
+                    <span className="text-2xl">{getFlagEmoji(r.team2)}</span> {r.team2}
+                  </div>
+
+                  <button
+                    onClick={() => removeResult(r.id)}
+                    className="ml-4 text-red-400 hover:text-red-600 font-bold text-sm bg-red-50 hover:bg-red-100 p-2 rounded"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+              {realResults.length === 0 && (
+                <div className="col-span-full py-8 text-center text-gray-500 italic">
+                  The tournament hasn't started yet. No official results logged.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function BackupView({ users, setUsers, predictions, setPredictions, realResults, setRealResults }) {
+    const fileInputRef = useRef(null);
+
+    const handleExport = () => {
+      const data = { users, predictions, realResults };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `panini-world-cup-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const handleImport = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target.result);
+          if (data.users && data.predictions && data.realResults) {
+            setUsers(data.users);
+            setPredictions(data.predictions);
+            setRealResults(data.realResults);
+            alert("Tournament data imported successfully!");
+          } else {
+            alert("Invalid file format. Ensure it's a backup file from this app.");
+          }
+        } catch (err) {
+          alert("Error reading file.");
+        }
+      };
+      reader.readAsText(file);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-300">
+        <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div>
+            <h2 className="text-xl font-black font-oswald tracking-wide text-[#1B4D3E] flex items-center gap-2 mb-1">
+              <Save /> Backup & Restore
+            </h2>
+            <p className="text-sm text-gray-500">Import or export your entire tournament's predictions and results.</p>
+          </div>
+
+          <div className="flex gap-3 w-full md:w-auto">
+            <input
+              type="file"
+              accept=".json"
+              ref={fileInputRef}
+              onChange={handleImport}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded font-bold hover:bg-gray-200 transition-colors border border-gray-300 shadow-sm"
+            >
+              <Upload size={18} /> Import Data
+            </button>
+
+            <button
+              onClick={handleExport}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#D4AF37] text-[#1B4D3E] px-4 py-2 rounded font-oswald uppercase tracking-wider hover:bg-amber-400 transition-colors shadow-sm"
+            >
+              <Download size={18} /> Export JSON
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- mount the app ---- */
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Node (only relevant if you later add a build setup)
+node_modules/
+dist/
