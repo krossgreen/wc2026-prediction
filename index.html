@@ -152,6 +152,21 @@
       padding-top: 6px;
       color: #0b1f38;
     }
+
+    /* Leaderboard: holographic sheen for the #1 row (reuses foil-shimmer) */
+    .leader-foil { position: relative; overflow: hidden; }
+    .leader-foil::after {
+      content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+      background: linear-gradient(105deg, transparent 18%, rgba(255,215,0,0.25) 24%, rgba(255,255,255,0.55) 30%, rgba(255,215,0,0.25) 36%, transparent 42%);
+      background-size: 200% auto;
+      animation: foil-shimmer 3.2s infinite linear;
+      mix-blend-mode: screen;
+    }
+    .leader-foil > * { position: relative; z-index: 2; }
+
+    /* Bobbing crown for the current leader */
+    @keyframes crown-bob { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-3px) rotate(6deg); } }
+    .leader-crown { animation: crown-bob 1.8s ease-in-out infinite; transform-origin: center bottom; }
   `;
 
   // --- Helper Functions ---
@@ -446,8 +461,11 @@
 
             <div className="space-y-2 text-xl md:text-3xl">
               {leaderboard.map((user, idx) => (
-                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors ${idx === 0 ? 'bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300' : idx === 2 ? 'bg-amber-950/40 text-amber-600' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
-                  <div className="col-span-1 text-center">{idx + 1}</div>
+                <div key={user.id} className={`grid grid-cols-12 gap-1 md:gap-2 items-center p-2 md:p-3 rounded transition-colors ${idx === 0 ? 'leader-foil bg-amber-900/40 text-amber-300 border border-amber-500/30' : idx === 1 ? 'bg-gray-800/60 text-gray-300' : idx === 2 ? 'bg-amber-950/40 text-amber-600' : 'bg-black/40 text-gray-400 hover:bg-gray-900'}`}>
+                  <div className="col-span-1 flex flex-col items-center justify-center leading-none gap-0.5">
+                    {idx === 0 && <Crown className="leader-crown text-[#D4AF37]" size={18} />}
+                    <span>{idx + 1}</span>
+                  </div>
                   <div className="col-span-4 flex flex-wrap md:flex-nowrap items-center gap-1 md:gap-2">
                     <span className="truncate">{user.name}</span>
                     <div className="flex font-sans">
@@ -464,7 +482,7 @@
                   <div className="col-span-1 text-center text-gray-300 bg-gray-900/40 py-1 rounded mx-0.5 md:mx-1">{user.completedPicks}</div>
                   <div className="col-span-1 text-center text-green-400 bg-green-900/20 py-1 rounded mx-0.5 md:mx-1">{user.exactMatches}</div>
                   <div className="col-span-2 text-center text-blue-400 bg-blue-900/20 py-1 rounded mx-0.5 md:mx-1">{user.correctOutcomes}</div>
-                  <div className="col-span-1 text-center text-3xl md:text-4xl text-amber-400 drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">{user.totalPoints}</div>
+                  <div className={`col-span-1 text-center drop-shadow-[0_0_5px_rgba(212,175,55,0.5)] ${idx === 0 ? 'text-4xl md:text-5xl text-amber-300 font-black' : 'text-3xl md:text-4xl text-amber-400'}`}>{user.totalPoints}</div>
                 </div>
               ))}
             </div>
