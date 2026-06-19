@@ -1126,20 +1126,11 @@
 
     if (submitted) {
       return (
-        <div className="max-w-lg mx-auto animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-oswald text-lg font-bold text-[#1B4D3E] uppercase tracking-wide">Thanks for your feedback!</h2>
-            </div>
-            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-              <iframe
-                className="absolute inset-0 w-full h-full"
-                src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1"
-                title="Thank you"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
+        <div className="max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-300">
+          <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-10 flex flex-col items-center gap-3 text-center">
+            <div className="text-5xl">🎶</div>
+            <h2 className="font-oswald text-2xl font-bold text-[#1B4D3E] uppercase tracking-wide">Thanks for the feedback!</h2>
+            <p className="text-gray-400 text-sm">We've noted everything down.</p>
           </div>
         </div>
       );
@@ -1179,7 +1170,7 @@
           </div>
 
           <button
-            onClick={() => setSubmitted(true)}
+            onClick={() => { window.open('https://www.youtube.com/watch?v=B1BnKd7RrjE', '_blank'); setSubmitted(true); }}
             className="flex items-center justify-center gap-2 w-full bg-[#1B4D3E] hover:bg-[#163d31] text-white font-oswald font-bold uppercase tracking-widest py-3 rounded-xl transition-colors shadow-sm text-sm"
           >
             Submit Feedback
