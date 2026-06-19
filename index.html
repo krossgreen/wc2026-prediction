@@ -407,7 +407,8 @@
                 { id: 'user-picks', label: 'Player Picks' },
                 { id: 'predictions', label: 'Paste Picks' },
                 { id: 'admin', label: 'Results' },
-                { id: 'backup', label: 'Backup' }
+                { id: 'backup', label: 'Backup' },
+                { id: 'feedback', label: 'Feedback' }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -461,6 +462,7 @@
               setRealResults={setRealResults}
             />
           )}
+          {activeTab === 'feedback' && <FeedbackView />}
         </main>
       </div>
     );
@@ -478,7 +480,8 @@
     const totalPicks   = leaderboard.reduce((s, u) => s + u.completedPicks, 0);
     const totalExact   = leaderboard.reduce((s, u) => s + u.exactMatches, 0);
     const totalOutcome = leaderboard.reduce((s, u) => s + u.correctOutcomes, 0);
-    const bestPicker   = leaderboard.reduce((best, u) => u.exactMatches > (best ? best.exactMatches : -1) ? u : best, null);
+    const maxExact     = Math.max(0, ...leaderboard.map(u => u.exactMatches));
+    const bestPickers  = maxExact > 0 ? leaderboard.filter(u => u.exactMatches === maxExact) : [];
     const headerDate   = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
     // Save the standings panel as a PNG to share in the group chat.
@@ -661,10 +664,10 @@
                 <span className="text-green-700">{totalExact} <span className="text-[#555]">exact</span></span>
                 <span className="text-[#444]">·</span>
                 <span className="text-blue-800">{totalOutcome} <span className="text-[#555]">correct</span></span>
-                {bestPicker && bestPicker.exactMatches > 0 && (
+                {bestPickers.length > 0 && (
                   <>
                     <span className="text-[#444]">·</span>
-                    <span className="text-[#555]">top scorer <span className="text-[#D4AF37]/70">{bestPicker.name}</span></span>
+                    <span className="text-[#555]">most exact <span className="text-[#D4AF37]/70">{bestPickers.map(u => u.name).join(' & ')}</span></span>
                   </>
                 )}
               </div>
@@ -1152,6 +1155,53 @@
               ))
             )}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  function FeedbackView() {
+    return (
+      <div className="max-w-lg mx-auto animate-in fade-in duration-300">
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-8 space-y-6">
+          <div>
+            <h2 className="font-oswald text-2xl font-bold text-[#1B4D3E] uppercase tracking-wide">Share your feedback</h2>
+            <p className="text-gray-500 text-sm mt-1">Help us improve the experience. All feedback is welcome.</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Your name</label>
+              <input type="text" placeholder="e.g. Kross" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]/30" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">How would you rate the app?</label>
+              <div className="flex gap-2">
+                {['😫','😕','😐','😊','🤩'].map((emoji, i) => (
+                  <label key={i} className="flex-1 flex flex-col items-center gap-1 cursor-pointer">
+                    <input type="radio" name="rating" value={i + 1} className="sr-only" />
+                    <span className="text-2xl hover:scale-125 transition-transform select-none">{emoji}</span>
+                    <span className="text-[10px] text-gray-400">{i + 1}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Any suggestions?</label>
+              <textarea rows={4} placeholder="What would make this better?" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1B4D3E]/30 resize-none" />
+            </div>
+          </div>
+
+          <a
+            href="https://youtu.be/dQw4w9WgXcQ?si=zK780WGH8kmmeEOM"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full bg-[#1B4D3E] hover:bg-[#163d31] text-white font-oswald font-bold uppercase tracking-widest py-3 rounded-xl transition-colors shadow-sm text-sm"
+          >
+            Submit Feedback
+          </a>
         </div>
       </div>
     );
