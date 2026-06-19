@@ -273,7 +273,6 @@
         let totalPoints = 0;
         let exactMatches = 0;
         let correctOutcomes = 0;
-        let parkTheBusCount = 0;
         let completedPicks = 0;
         let form = [];
 
@@ -295,35 +294,10 @@
             if (pts === 3) exactMatches += 1;
             if (pts === 1) correctOutcomes += 1;
             form.push(pts);
-
-            if ((pred.score1 === 0 && pred.score2 === 0) ||
-                (pred.score1 === 1 && pred.score2 === 0) ||
-                (pred.score1 === 0 && pred.score2 === 1)) {
-              parkTheBusCount++;
-            }
           }
         });
 
-        let isOracle = false;
-        let streak = 0;
-        for (let pt of form) {
-          if (pt === 3) { streak++; if(streak>=3) isOracle=true; }
-          else streak = 0;
-        }
-
-        return { ...user, totalPoints, exactMatches, correctOutcomes, userPreds, form: form.slice(-5), parkTheBusCount, isOracle, completedPicks };
-      });
-
-      const maxPark = Math.max(0, ...stats.map(s => s.parkTheBusCount));
-      const eligibleWildcards = stats.filter(s => s.exactMatches > 0);
-      const minPts = eligibleWildcards.length > 0 ? Math.min(...eligibleWildcards.map(s => s.totalPoints)) : -1;
-
-      stats.forEach(s => {
-        s.badges = [];
-        if (s.isOracle) s.badges.push({ icon: '🔮', title: 'The Oracle (3 Exact Scores in a row)' });
-        if (maxPark > 0 && s.parkTheBusCount === maxPark) s.badges.push({ icon: '🛡️', title: 'Park the Bus (Most 0-0/1-0 picks)' });
-        if (s.exactMatches > 0 && s.totalPoints === minPts) s.badges.push({ icon: '🎲', title: 'Wildcard (Hits upsets but low average)' });
-      });
+        return { ...user, totalPoints, exactMatches, correctOutcomes, userPreds, form: form.slice(-5), completedPicks };
 
       const tiebreak = (a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints; // PTS (more)
@@ -617,13 +591,8 @@
                       </span>
                     )}
                   </div>
-                  <div className="col-span-4 flex flex-wrap md:flex-nowrap items-center gap-1 md:gap-2">
+                  <div className="col-span-4 flex items-center">
                     <span className="truncate">{user.name}</span>
-                    <div className="flex font-sans">
-                      {user.badges.map((b, i) => (
-                        <span key={i} title={b.title} className="text-base md:text-xl drop-shadow-md cursor-help">{b.icon}</span>
-                      ))}
-                    </div>
                   </div>
                   <div className="col-span-2 flex justify-center gap-1 md:gap-2 items-center">
                     {user.form.length > 0 ? user.form.map((res, i) => (
