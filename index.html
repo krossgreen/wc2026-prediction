@@ -74,8 +74,7 @@
     Activity = _makeIcon('Activity'), CheckCircle = _makeIcon('CheckCircle'),
     ShieldAlert = _makeIcon('ShieldAlert'), Award = _makeIcon('Award'), Star = _makeIcon('Star'),
     Download = _makeIcon('Download'), Upload = _makeIcon('Upload'), Crown = _makeIcon('Crown'),
-    Medal = _makeIcon('Medal'), Users = _makeIcon('Users'),
-    ToggleLeft = _makeIcon('ToggleLeft'), ToggleRight = _makeIcon('ToggleRight');
+    Medal = _makeIcon('Medal'), Users = _makeIcon('Users');
 
   // --- CSS Enhancements (Foil, Fonts, Tickets, Ledger, Metal) ---
   const customStyles = `
@@ -267,7 +266,6 @@
     const [predictions, setPredictions] = useState(initialPredictions);
     const [realResults, setRealResults] = useState(initialRealResults);
     const [activeTab, setActiveTab] = useState('leaderboard');
-    const [showBadges, setShowBadges] = useState(false);
 
     // --- Score Calculation ---
     const leaderboard = useMemo(() => {
@@ -429,7 +427,7 @@
         {/* Main Content Area */}
         <main className="max-w-6xl mx-auto p-6 min-h-[80vh]">
           {activeTab === 'leaderboard' && (
-            <LeaderboardView leaderboard={leaderboard} realResults={realResults} showBadges={showBadges} setShowBadges={setShowBadges} />
+            <LeaderboardView leaderboard={leaderboard} realResults={realResults} />
           )}
           {activeTab === 'user-picks' && (
             <UserPicksView
@@ -470,7 +468,7 @@
 
   // --- VIEWS ---
 
-  function LeaderboardView({ leaderboard, realResults, showBadges, setShowBadges }) {
+  function LeaderboardView({ leaderboard, realResults }) {
     const podiumRank1 = leaderboard.filter(u => u.rank === 1);
     const podiumRank2 = leaderboard.filter(u => u.rank === 2);
     const podiumRank3 = leaderboard.filter(u => u.rank === 3);
@@ -524,13 +522,6 @@
       <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
 
         <div className="flex justify-end items-center gap-3 mb-2">
-          <button
-            onClick={() => setShowBadges(!showBadges)}
-            className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#1B4D3E] transition-colors bg-white px-3 py-1.5 rounded-full shadow-sm border border-gray-200"
-          >
-            {showBadges ? <ToggleRight className="text-[#D4AF37]" size={20} /> : <ToggleLeft size={20} />}
-            Player Badges
-          </button>
           <button
             onClick={exportStandings}
             disabled={exporting}
@@ -629,7 +620,7 @@
                   <div className="col-span-4 flex flex-wrap md:flex-nowrap items-center gap-1 md:gap-2">
                     <span className="truncate">{user.name}</span>
                     <div className="flex font-sans">
-                      {showBadges && user.badges.map((b, i) => (
+                      {user.badges.map((b, i) => (
                         <span key={i} title={b.title} className="text-base md:text-xl drop-shadow-md cursor-help">{b.icon}</span>
                       ))}
                     </div>
