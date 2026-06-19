@@ -298,6 +298,7 @@
         });
 
         return { ...user, totalPoints, exactMatches, correctOutcomes, userPreds, form: form.slice(-5), completedPicks };
+      });
 
       const tiebreak = (a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints; // PTS (more)
