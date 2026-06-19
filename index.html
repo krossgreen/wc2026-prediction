@@ -723,7 +723,7 @@
                   <div className="absolute top-2 right-2 text-xs font-bold text-[#b8b3a5] bg-[#e1dcd0] px-2 py-0.5 rounded-full">#?</div>
                   <div className="text-6xl text-[#d1ccc0] opacity-50 mb-4 drop-shadow-sm">🏆</div>
                   <p className="text-center font-bold text-[#a09c8f] text-sm px-4 leading-tight">
-                    Sticker missing!<br/><span className="text-xs font-normal">Paste text to open a pack.</span>
+                    No picks yet!<br/><span className="text-xs font-normal">Paste text to add predictions.</span>
                   </p>
                 </div>
               </div>
@@ -843,7 +843,7 @@
       }));
       setPredictions(prev => [...prev, ...newPreds]);
       setRawText('');
-      alert("Stickers printed and saved successfully!");
+      alert("Picks saved successfully!");
     };
 
     const loadDemoText = () => {
@@ -1216,7 +1216,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `panini-world-cup-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.download = `texaus-wc2026-backup-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
     };
