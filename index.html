@@ -641,6 +641,7 @@
 
   function UserPicksView({ users, predictions, realResults }) {
     const [selectedUser, setSelectedUser] = useState(users[0]?.id || null);
+    const [viewMode, setViewMode] = useState('tickets');
 
     const activeUser = users.find(u => u.id === selectedUser);
     const userPreds = predictions.filter(p => p.userId === selectedUser);
@@ -648,6 +649,29 @@
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
 
+        {/* View Mode Toggle */}
+        <div className="flex gap-2 font-oswald">
+          {[{ id: 'tickets', label: 'By Player' }, { id: 'matrix', label: 'Coverage Matrix' }].map(m => (
+            <button
+              key={m.id}
+              onClick={() => setViewMode(m.id)}
+              className={`px-4 py-2 text-sm rounded-full font-bold tracking-wider transition-all shadow-sm border-2 ${
+                viewMode === m.id
+                  ? 'bg-[#D4AF37] text-[#1B4D3E] border-[#D4AF37]'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-[#D4AF37] hover:text-[#1B4D3E]'
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+
+        {viewMode === 'matrix' && (
+          <CoverageMatrixView users={users} predictions={predictions} />
+        )}
+
+        {viewMode === 'tickets' && (
+        <>
         {/* Player Selector Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide font-oswald">
           {users.map(u => (
@@ -745,6 +769,79 @@
             )}
           </div>
         )}
+        </>
+        )}
+      </div>
+    );
+  }
+
+  // Coverage Matrix: every player x every match they could've picked, so a
+  // missing prediction (someone's guess never got pasted in) is easy to spot.
+  function CoverageMatrixView({ users, predictions }) {
+    const matches = useMemo(() => {
+      const map = {};
+      predictions.forEach(p => {
+        const key = normalizeTeamName(p.team1) + '_' + normalizeTeamName(p.team2);
+        if (!map[key]) map[key] = { team1: p.team1, team2: p.team2 };
+      });
+      return Object.values(map).sort((a, b) => a.team1.localeCompare(b.team1));
+    }, [predictions]);
+
+    const findPick = (userId, match) => predictions.find(p => p.userId === userId &&
+      normalizeTeamName(p.team1) === normalizeTeamName(match.team1) &&
+      normalizeTeamName(p.team2) === normalizeTeamName(match.team2));
+
+    const missingCount = (userId) => matches.filter(m => !findPick(userId, m)).length;
+
+    if (matches.length === 0) {
+      return (
+        <div className="text-center text-gray-400 italic py-12 bg-white rounded-lg border-2 border-gray-200">
+          No predictions pasted in yet — nothing to check.
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg border-2 border-[#e5e7eb] shadow-lg overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-[#1B4D3E] text-white font-oswald uppercase tracking-wide text-xs">
+              <th className="text-left p-3 sticky left-0 bg-[#1B4D3E] z-10 whitespace-nowrap">Match</th>
+              {users.map(u => (
+                <th key={u.id} className="p-3 text-center whitespace-nowrap">
+                  {u.name}
+                  {missingCount(u.id) > 0 && (
+                    <span className="block text-[10px] font-bold text-red-300 normal-case tracking-normal">{missingCount(u.id)} missing</span>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matches.map((m, i) => {
+              const rowBg = i % 2 === 0 ? 'bg-gray-50' : 'bg-white';
+              return (
+                <tr key={i} className={rowBg}>
+                  <td className={`p-2 px-3 font-bold text-gray-700 whitespace-nowrap sticky left-0 ${rowBg}`}>
+                    {m.team1} <span className="text-gray-400 font-normal">vs</span> {m.team2}
+                  </td>
+                  {users.map(u => {
+                    const pick = findPick(u.id, m);
+                    return (
+                      <td key={u.id} className="p-2 text-center">
+                        {pick ? (
+                          <span className="font-vt323 text-base bg-green-100 text-green-700 px-2 py-0.5 rounded">{pick.score1}-{pick.score2}</span>
+                        ) : (
+                          <span className="font-bold text-[10px] uppercase tracking-wider text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded">Missing</span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   }
