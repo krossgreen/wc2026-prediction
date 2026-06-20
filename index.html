@@ -667,7 +667,7 @@
         </div>
 
         {viewMode === 'matrix' && (
-          <CoverageMatrixView users={users} predictions={predictions} />
+          <CoverageMatrixView users={users} predictions={predictions} realResults={realResults} />
         )}
 
         {viewMode === 'tickets' && (
@@ -777,15 +777,28 @@
 
   // Coverage Matrix: every player x every match they could've picked, so a
   // missing prediction (someone's guess never got pasted in) is easy to spot.
-  function CoverageMatrixView({ users, predictions }) {
+  function CoverageMatrixView({ users, predictions, realResults }) {
     const matches = useMemo(() => {
       const map = {};
       predictions.forEach(p => {
         const key = normalizeTeamName(p.team1) + '_' + normalizeTeamName(p.team2);
         if (!map[key]) map[key] = { team1: p.team1, team2: p.team2 };
       });
-      return Object.values(map).sort((a, b) => a.team1.localeCompare(b.team1));
-    }, [predictions]);
+      // Attach the official match date (if the result's been logged yet) so
+      // we can order chronologically; undated (not-yet-played) matches sort last.
+      Object.values(map).forEach(m => {
+        const real = realResults.find(r =>
+          normalizeTeamName(r.team1) === normalizeTeamName(m.team1) &&
+          normalizeTeamName(r.team2) === normalizeTeamName(m.team2));
+        m.date = real ? real.date : null;
+      });
+      return Object.values(map).sort((a, b) => {
+        if (a.date && b.date) return a.date.localeCompare(b.date);
+        if (a.date) return -1;
+        if (b.date) return 1;
+        return a.team1.localeCompare(b.team1);
+      });
+    }, [predictions, realResults]);
 
     const findPick = (userId, match) => predictions.find(p => p.userId === userId &&
       normalizeTeamName(p.team1) === normalizeTeamName(match.team1) &&
@@ -823,7 +836,10 @@
               return (
                 <tr key={i} className={rowBg}>
                   <td className={`p-2 px-3 font-bold text-gray-700 whitespace-nowrap sticky left-0 ${rowBg}`}>
-                    {m.team1} <span className="text-gray-400 font-normal">vs</span> {m.team2}
+                    <div>{m.team1} <span className="text-gray-400 font-normal">vs</span> {m.team2}</div>
+                    <div className="text-[10px] font-normal uppercase tracking-wider text-gray-400">
+                      {m.date ? formatDay(m.date) : <span className="text-[#D4AF37]">Kickoff Pending</span>}
+                    </div>
                   </td>
                   {users.map(u => {
                     const pick = findPick(u.id, m);
