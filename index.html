@@ -176,6 +176,22 @@
     return name.toLowerCase().replace(/[^a-z]/g, '');
   };
 
+  // Tournament stages, in chronological order.
+  const ROUNDS = ['Group Stage', 'Round of 32', 'Round of 16', 'Quarterfinal', 'Semifinal', 'Third Place Play-off', 'Final'];
+  // A prediction/result with no round set predates this field — treat it as
+  // Group Stage so old/imported data keeps matching exactly as before.
+  const normalizeRound = (round) => round || 'Group Stage';
+
+  // Two fixtures (a prediction, a logged result, or a coverage-matrix row —
+  // anything with team1/team2/round) are the same real-world match only if
+  // both the teams AND the round match. Needed because the same two teams
+  // can meet twice in a tournament (e.g. group stage, then again in the
+  // knockouts) — matching on team names alone would conflate the two.
+  const sameFixture = (a, b) =>
+    normalizeTeamName(a.team1) === normalizeTeamName(b.team1) &&
+    normalizeTeamName(a.team2) === normalizeTeamName(b.team2) &&
+    normalizeRound(a.round) === normalizeRound(b.round);
+
   // normalizedTeamName -> ISO 3166-1 alpha-2 (for flagcdn images). Covers the
   // realistic World Cup field; anything unmapped falls back to a lettered chip.
   const TEAM_ISO = {
@@ -284,12 +300,7 @@
         const chronologicalResults = [...realResults];
 
         chronologicalResults.forEach(real => {
-          const normT1 = normalizeTeamName(real.team1);
-          const normT2 = normalizeTeamName(real.team2);
-
-          const pred = userPreds.find(p =>
-            normalizeTeamName(p.team1) === normT1 && normalizeTeamName(p.team2) === normT2
-          );
+          const pred = userPreds.find(p => sameFixture(p, real));
 
           if (pred) {
             completedPicks++;
@@ -334,9 +345,7 @@
           let totalPoints = 0, exactMatches = 0, correctOutcomes = 0, completedPicks = 0;
           const preds = predictions.filter(p => p.userId === user.id);
           resultSet.forEach(real => {
-            const pred = preds.find(p =>
-              normalizeTeamName(p.team1) === normalizeTeamName(real.team1) &&
-              normalizeTeamName(p.team2) === normalizeTeamName(real.team2));
+            const pred = preds.find(p => sameFixture(p, real));
             if (pred) {
               completedPicks++;
               const pts = calculatePoints(pred, real);
@@ -737,9 +746,7 @@
             ) : (
               <div className="space-y-4">
                 {userPreds.map(pred => {
-                  const normT1 = normalizeTeamName(pred.team1);
-                  const normT2 = normalizeTeamName(pred.team2);
-                  const real = realResults.find(r => normalizeTeamName(r.team1) === normT1 && normalizeTeamName(r.team2) === normT2);
+                  const real = realResults.find(r => sameFixture(pred, r));
                   const pts = calculatePoints(pred, real);
 
                   return (
@@ -752,6 +759,7 @@
 
                       {/* Score Box */}
                       <div className="flex flex-col items-center px-2 sm:px-4 w-28 sm:w-36 z-10">
+                        <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{normalizeRound(pred.round)}</div>
                         <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
                           {pred.score1} - {pred.score2}
                         </div>
@@ -803,28 +811,28 @@
     const matches = useMemo(() => {
       const map = {};
       predictions.forEach(p => {
-        const key = normalizeTeamName(p.team1) + '_' + normalizeTeamName(p.team2);
-        if (!map[key]) map[key] = { team1: p.team1, team2: p.team2 };
+        const round = normalizeRound(p.round);
+        const key = normalizeTeamName(p.team1) + '_' + normalizeTeamName(p.team2) + '_' + round;
+        if (!map[key]) map[key] = { team1: p.team1, team2: p.team2, round };
       });
       // Attach the official match date (if the result's been logged yet) so
       // we can order chronologically; undated (not-yet-played) matches sort last.
       Object.values(map).forEach(m => {
-        const real = realResults.find(r =>
-          normalizeTeamName(r.team1) === normalizeTeamName(m.team1) &&
-          normalizeTeamName(r.team2) === normalizeTeamName(m.team2));
+        const real = realResults.find(r => sameFixture(m, r));
         m.date = real ? real.date : null;
       });
+      const roundIndex = (r) => { const i = ROUNDS.indexOf(r); return i === -1 ? ROUNDS.length : i; };
       return Object.values(map).sort((a, b) => {
         if (a.date && b.date) return a.date.localeCompare(b.date);
         if (a.date) return -1;
         if (b.date) return 1;
+        const ri = roundIndex(a.round) - roundIndex(b.round);
+        if (ri !== 0) return ri;
         return a.team1.localeCompare(b.team1);
       });
     }, [predictions, realResults]);
 
-    const findPick = (userId, match) => predictions.find(p => p.userId === userId &&
-      normalizeTeamName(p.team1) === normalizeTeamName(match.team1) &&
-      normalizeTeamName(p.team2) === normalizeTeamName(match.team2));
+    const findPick = (userId, match) => predictions.find(p => p.userId === userId && sameFixture(p, match));
 
     const missingCount = (userId) => matches.filter(m => !findPick(userId, m)).length;
 
@@ -860,7 +868,7 @@
                   <td className={`p-2 px-3 font-bold text-gray-700 whitespace-nowrap sticky left-0 ${rowBg}`}>
                     <div>{m.team1} <span className="text-gray-400 font-normal">vs</span> {m.team2}</div>
                     <div className="text-[10px] font-normal uppercase tracking-wider text-gray-400">
-                      {m.date ? formatDay(m.date) : <span className="text-[#D4AF37]">Kickoff Pending</span>}
+                      {m.round} · {m.date ? formatDay(m.date) : <span className="text-[#D4AF37]">Kickoff Pending</span>}
                     </div>
                   </td>
                   {users.map(u => {
@@ -889,6 +897,7 @@
     const [newUserName, setNewUserName] = useState('');
     const [rawText, setRawText] = useState('');
     const [parsedResults, setParsedResults] = useState([]);
+    const [selectedRound, setSelectedRound] = useState('Group Stage');
 
     // Real-time parsing logic
     useEffect(() => {
@@ -935,6 +944,7 @@
       const newPreds = parsedResults.map(p => ({
         id: `p${Date.now()}_${Math.random()}`,
         userId: selectedUserId,
+        round: selectedRound,
         ...p
       }));
       setPredictions(prev => [...prev, ...newPreds]);
@@ -963,6 +973,17 @@
                 onChange={(e) => setSelectedUserId(e.target.value)}
               >
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+
+            <div className="flex-1">
+              <label className="block text-xs font-bold uppercase text-gray-500 mb-1" title="Applies to every pick pasted below — lets a rematch (e.g. same two teams in the group stage, then again in the knockouts) be told apart">Round / Stage</label>
+              <select
+                className="w-full p-2 border border-gray-300 rounded font-bold text-gray-700 focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] outline-none"
+                value={selectedRound}
+                onChange={(e) => setSelectedRound(e.target.value)}
+              >
+                {ROUNDS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
 
@@ -1009,6 +1030,7 @@
             <div className="mt-6 bg-[#f9f9f9] p-4 rounded-lg border border-dashed border-gray-300">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <CheckCircle size={16} className="text-green-500" /> Parsed Ticket Preview
+                <span className="text-[#D4AF37] normal-case font-normal">· saving as {selectedRound}</span>
               </h3>
 
               {parsedResults.length > 0 ? (
@@ -1054,17 +1076,17 @@
     const [s1, setS1] = useState('');
     const [s2, setS2] = useState('');
     const [date, setDate] = useState(todayStr());
+    const [round, setRound] = useState('Group Stage');
 
     const upcomingMatches = useMemo(() => {
       const matchMap = {};
       predictions.forEach(p => {
-        const normT1 = normalizeTeamName(p.team1);
-        const normT2 = normalizeTeamName(p.team2);
-        const isFinished = realResults.some(r => normalizeTeamName(r.team1) === normT1 && normalizeTeamName(r.team2) === normT2);
+        const isFinished = realResults.some(r => sameFixture(p, r));
 
         if (!isFinished) {
-          const key = `${p.team1} vs ${p.team2}`;
-          if (!matchMap[key]) matchMap[key] = { team1: p.team1, team2: p.team2, h:0, d:0, a:0, total:0 };
+          const pRound = normalizeRound(p.round);
+          const key = `${normalizeTeamName(p.team1)}_${normalizeTeamName(p.team2)}_${pRound}`;
+          if (!matchMap[key]) matchMap[key] = { team1: p.team1, team2: p.team2, round: pRound, h:0, d:0, a:0, total:0 };
           matchMap[key].total++;
           if (p.score1 > p.score2) matchMap[key].h++;
           else if (p.score1 < p.score2) matchMap[key].a++;
@@ -1081,15 +1103,17 @@
       const newResult = {
         id: `r${Date.now()}`,
         date,
+        round,
         team1: t1.trim(),
         team2: t2.trim(),
         score1: parseInt(s1, 10),
         score2: parseInt(s2, 10)
       };
 
-      const filtered = realResults.filter(r =>
-        !(normalizeTeamName(r.team1) === normalizeTeamName(t1) && normalizeTeamName(r.team2) === normalizeTeamName(t2))
-      );
+      // Only replaces a result for the same team pair AND round (fixing a
+      // typo on that match) — a different round with the same two teams
+      // (a rematch) is a separate fixture and must not be overwritten.
+      const filtered = realResults.filter(r => !sameFixture(r, newResult));
 
       setRealResults([...filtered, newResult]);
       setT1(''); setT2(''); setS1(''); setS2('');
@@ -1132,6 +1156,7 @@
                       <span className="text-gray-400 text-sm">vs</span>
                       <span className="flex items-center gap-2 text-gray-800">{m.team2} {getFlagEmoji(m.team2)}</span>
                     </div>
+                    <div className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">{m.round}</div>
 
                     {/* Split Bar */}
                     <div className="w-full h-3 bg-gray-200 rounded-full flex overflow-hidden mb-2">
@@ -1164,12 +1189,20 @@
              <div className="absolute top-0 bottom-0 left-10 w-0.5 bg-red-400/50 z-10 pointer-events-none"></div>
 
              <h3 className="text-lg font-caveat font-bold text-gray-500 mb-4 ml-8 tracking-wider">Log Official Full Time Score</h3>
-             <div className="flex items-center gap-3 mb-4 pl-8 relative z-20">
+             <div className="flex items-center gap-3 mb-4 pl-8 relative z-20 flex-wrap">
               <label className="font-oswald uppercase tracking-widest text-xs font-bold text-gray-500">Match Day</label>
               <input
                 type="date" value={date} onChange={e => setDate(e.target.value)} required
                 className="p-2 bg-white/70 border-2 border-gray-400 rounded font-caveat text-lg font-bold text-gray-700 outline-none focus:border-[#D4AF37]"
               />
+              <label className="font-oswald uppercase tracking-widest text-xs font-bold text-gray-500 ml-2">Round</label>
+              <select
+                value={round} onChange={e => setRound(e.target.value)}
+                title="Lets the same two teams meeting twice (e.g. group stage, then a knockout rematch) be logged as separate matches"
+                className="p-2 bg-white/70 border-2 border-gray-400 rounded font-caveat text-lg font-bold text-gray-700 outline-none focus:border-[#D4AF37]"
+              >
+                {ROUNDS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
              </div>
              <div className="flex flex-col md:flex-row items-center gap-4 relative z-20 pl-8">
               <input
@@ -1230,8 +1263,11 @@
                           {r.team1} <span className="text-2xl">{getFlagEmoji(r.team1)}</span>
                         </div>
 
-                        <div className="px-4 mx-2 bg-black text-white font-vt323 text-3xl py-1 rounded shadow-inner">
-                          {r.score1} - {r.score2}
+                        <div className="flex flex-col items-center mx-2">
+                          <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-1">{normalizeRound(r.round)}</span>
+                          <div className="px-4 bg-black text-white font-vt323 text-3xl py-1 rounded shadow-inner">
+                            {r.score1} - {r.score2}
+                          </div>
                         </div>
 
                         <div className="flex-1 font-bold flex items-center gap-2 text-gray-800">
