@@ -673,9 +673,17 @@
   function UserPicksView({ users, predictions, realResults }) {
     const [selectedUser, setSelectedUser] = useState(users[0]?.id || null);
     const [viewMode, setViewMode] = useState('tickets');
+    const [playerSearch, setPlayerSearch] = useState('');
 
     const activeUser = users.find(u => u.id === selectedUser);
     const userPreds = predictions.filter(p => p.userId === selectedUser);
+    const filteredUsers = users.filter(u => u.name.toLowerCase().includes(playerSearch.trim().toLowerCase()));
+
+    const handleSearchKeyDown = (e) => {
+      if (e.key === 'Enter' && filteredUsers.length > 0) {
+        setSelectedUser(filteredUsers[0].id);
+      }
+    };
 
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -703,22 +711,47 @@
 
         {viewMode === 'tickets' && (
         <>
-        {/* Player Selector Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide font-oswald">
-          {users.map(u => (
+        {/* Player Search */}
+        <div className="relative max-w-xs">
+          <input
+            type="text"
+            value={playerSearch}
+            onChange={(e) => setPlayerSearch(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search players…"
+            className="w-full border-2 border-gray-200 rounded-full pl-4 pr-9 py-2 text-sm font-oswald font-bold tracking-wide outline-none focus:border-[#D4AF37] text-gray-700"
+          />
+          {playerSearch && (
             <button
-              key={u.id}
-              onClick={() => setSelectedUser(u.id)}
-              className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap tracking-wider transition-all shadow-sm ${
-                selectedUser === u.id
-                  ? 'bg-[#1B4D3E] text-white border-2 border-[#1B4D3E]'
-                  : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-[#D4AF37] hover:text-[#1B4D3E]'
-              }`}
+              onClick={() => setPlayerSearch('')}
+              title="Clear search"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-lg leading-none px-1"
             >
-              {u.name}
+              ×
             </button>
-          ))}
+          )}
         </div>
+
+        {/* Player Selector Tabs */}
+        {filteredUsers.length > 0 ? (
+          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide font-oswald">
+            {filteredUsers.map(u => (
+              <button
+                key={u.id}
+                onClick={() => setSelectedUser(u.id)}
+                className={`px-5 py-2.5 rounded-full font-bold whitespace-nowrap tracking-wider transition-all shadow-sm ${
+                  selectedUser === u.id
+                    ? 'bg-[#1B4D3E] text-white border-2 border-[#1B4D3E]'
+                    : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-[#D4AF37] hover:text-[#1B4D3E]'
+                }`}
+              >
+                {u.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-400 text-sm italic">No players match "{playerSearch}".</p>
+        )}
 
         {/* Predictions List */}
         {activeUser && (
