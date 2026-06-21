@@ -172,8 +172,10 @@
   `;
 
   // --- Helper Functions ---
+  // Strips accents first (so "Curaçao" and "Curacao" normalize to the same
+  // key) before lowercasing and dropping anything that isn't a letter.
   const normalizeTeamName = (name) => {
-    return name.toLowerCase().replace(/[^a-z]/g, '');
+    return name.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z]/g, '');
   };
 
   // Tournament stages, in chronological order.
@@ -201,6 +203,7 @@
     brazil:'br', spain:'es', germany:'de', england:'gb-eng', scotland:'gb-sct', wales:'gb-wls',
     portugal:'pt', netherlands:'nl', holland:'nl', italy:'it', croatia:'hr', denmark:'dk',
     switzerland:'ch', poland:'pl', serbia:'rs', morocco:'ma', tunisia:'tn', ghana:'gh',
+    bosnia:'ba', bosniaherzegovina:'ba', bosniaandherzegovina:'ba', curacao:'cw',
     cameroon:'cm', nigeria:'ng', ivorycoast:'ci', senegalese:'sn', southafrica:'za',
     mexico:'mx', usa:'us', unitedstates:'us', canada:'ca', costarica:'cr', ecuador:'ec',
     colombia:'co', peru:'pe', paraguay:'py', chile:'cl', bolivia:'bo', venezuela:'ve',
@@ -940,11 +943,12 @@
       }
 
       let cleanText = rawText.replace(/(\d)(\d\.)/g, '$1 $2');
-      cleanText = cleanText.replace(/(\d)([a-zA-Z])/g, '$1 $2');
+      cleanText = cleanText.replace(/(\d)([\p{L}])/gu, '$1 $2');
       // Team separator: either a "vs" token (v / vs / v.s. / versus, whitespace-
       // bounded) OR a dash (e.g. "Austria - Jordan"). Scores follow, dash/space
-      // separated. Teams are letters/spaces; scores are digits.
-      const regex = /([a-zA-Z][a-zA-Z\s]*?)(?:\s+(?:v\.?\s*s\.?|versus)\s+|\s*[-–—]\s*)([a-zA-Z][a-zA-Z\s]*?)[\s\-–—]+(\d+)[\s\-–—]+(\d+)/gi;
+      // separated. Teams are letters/spaces (\p{L} so accented names like
+      // "Curaçao" parse too); scores are digits.
+      const regex = /([\p{L}][\p{L}\s]*?)(?:\s+(?:v\.?\s*s\.?|versus)\s+|\s*[-–—]\s*)([\p{L}][\p{L}\s]*?)[\s\-–—]+(\d+)[\s\-–—]+(\d+)/giu;
 
       const results = [];
       let match;
