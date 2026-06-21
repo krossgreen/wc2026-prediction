@@ -1077,6 +1077,17 @@
     const [s2, setS2] = useState('');
     const [date, setDate] = useState(todayStr());
     const [round, setRound] = useState('Group Stage');
+    const score1Ref = useRef(null);
+
+    // Crowd Consensus cards are clickable: fill in the teams/round below
+    // instead of retyping them, then jump straight to the score inputs.
+    const fillResultForm = (m) => {
+      setT1(m.team1);
+      setT2(m.team2);
+      setRound(m.round);
+      score1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      score1Ref.current?.focus();
+    };
 
     const upcomingMatches = useMemo(() => {
       const matchMap = {};
@@ -1150,13 +1161,19 @@
                 const aPct = Math.round((m.a / m.total) * 100);
 
                 return (
-                  <div key={idx} className="bg-gray-50 border border-gray-200 p-4 rounded shadow-sm">
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => fillResultForm(m)}
+                    title="Fill in the result form below with these teams"
+                    className="text-left bg-gray-50 border border-gray-200 p-4 rounded shadow-sm cursor-pointer hover:border-[#D4AF37] hover:shadow-md hover:bg-amber-50/40 transition-all w-full"
+                  >
                     <div className="flex justify-between items-center mb-2 font-bold text-lg">
                       <span className="flex items-center gap-2 text-gray-800">{getFlagEmoji(m.team1)} {m.team1}</span>
                       <span className="text-gray-400 text-sm">vs</span>
                       <span className="flex items-center gap-2 text-gray-800">{m.team2} {getFlagEmoji(m.team2)}</span>
                     </div>
-                    <div className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">{m.round}</div>
+                    <div className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">{m.round} <span className="text-[#D4AF37]">· click to log result</span></div>
 
                     {/* Split Bar */}
                     <div className="w-full h-3 bg-gray-200 rounded-full flex overflow-hidden mb-2">
@@ -1170,7 +1187,7 @@
                       {dPct > 0 && <span>{dPct}% Draw</span>}
                       <span className="text-blue-600">{aPct}% Win</span>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -1213,6 +1230,7 @@
 
               <div className="flex gap-2 items-center">
                 <input
+                  ref={score1Ref}
                   type="number" min="0" placeholder="0"
                   className="w-16 p-2 bg-white/50 border-2 border-gray-400 rounded text-center text-3xl font-caveat font-bold outline-none focus:border-[#D4AF37]"
                   value={s1} onChange={e => setS1(e.target.value)} required
