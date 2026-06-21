@@ -266,6 +266,10 @@
     const [predictions, setPredictions] = useState(initialPredictions);
     const [realResults, setRealResults] = useState(initialRealResults);
     const [activeTab, setActiveTab] = useState('leaderboard');
+    // Tiebreaker order when players are level on points: which secondary
+    // stat decides the placing first. 'picks-first' (fewer picks used wins)
+    // is the original/default criteria.
+    const [tiebreakMode, setTiebreakMode] = useState('picks-first');
 
     // --- Score Calculation ---
     const leaderboard = useMemo(() => {
@@ -302,8 +306,13 @@
 
       const tiebreak = (a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints; // PTS (more)
-        if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
-        if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
+        if (tiebreakMode === 'exact-first') {
+          if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
+          if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
+        } else {
+          if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
+          if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
+        }
         return b.correctOutcomes - a.correctOutcomes; // OUTCOME (more)
       };
       stats.sort(tiebreak);
@@ -355,7 +364,7 @@
       });
 
       return stats;
-    }, [users, predictions, realResults]);
+    }, [users, predictions, realResults, tiebreakMode]);
 
     // --- Main Render ---
     return (
@@ -402,7 +411,7 @@
         {/* Main Content Area */}
         <main className="max-w-6xl mx-auto p-6 min-h-[80vh]">
           {activeTab === 'leaderboard' && (
-            <LeaderboardView leaderboard={leaderboard} realResults={realResults} />
+            <LeaderboardView leaderboard={leaderboard} realResults={realResults} tiebreakMode={tiebreakMode} setTiebreakMode={setTiebreakMode} />
           )}
           {activeTab === 'user-picks' && (
             <UserPicksView
@@ -443,7 +452,7 @@
 
   // --- VIEWS ---
 
-  function LeaderboardView({ leaderboard, realResults }) {
+  function LeaderboardView({ leaderboard, realResults, tiebreakMode, setTiebreakMode }) {
     const podiumRank1 = leaderboard.filter(u => u.rank === 1);
     const podiumRank2 = leaderboard.filter(u => u.rank === 2);
     const podiumRank3 = leaderboard.filter(u => u.rank === 3);
@@ -496,7 +505,20 @@
     return (
       <div className="space-y-8 animate-in fade-in zoom-in-95 duration-300">
 
-        <div className="flex justify-end items-center gap-3 mb-2">
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-2">
+          <div className="flex items-center gap-2 font-oswald">
+            <label htmlFor="tiebreak-select" className="text-xs font-bold uppercase tracking-wider text-gray-500">Tiebreaker</label>
+            <select
+              id="tiebreak-select"
+              value={tiebreakMode}
+              onChange={(e) => setTiebreakMode(e.target.value)}
+              title="Order of criteria used to split players level on points"
+              className="text-sm font-bold text-[#1B4D3E] bg-white border-2 border-gray-200 rounded-full px-3 py-1.5 outline-none focus:border-[#D4AF37] cursor-pointer"
+            >
+              <option value="picks-first">Points → Picks (less) → Exact (more)</option>
+              <option value="exact-first">Points → Exact (more) → Picks (less)</option>
+            </select>
+          </div>
           <button
             onClick={exportStandings}
             disabled={exporting}
