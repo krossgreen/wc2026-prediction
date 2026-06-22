@@ -286,9 +286,9 @@
     const [realResults, setRealResults] = useState(initialRealResults);
     const [activeTab, setActiveTab] = useState('leaderboard');
     // Tiebreaker order when players are level on points: which secondary
-    // stat decides the placing first. 'picks-first' (fewer picks used wins)
-    // is the original/default criteria.
-    const [tiebreakMode, setTiebreakMode] = useState('picks-first');
+    // stat decides the placing first. 'exact-first' (more exact scores wins)
+    // is the default criteria.
+    const [tiebreakMode, setTiebreakMode] = useState('exact-first');
 
     // --- Score Calculation ---
     const leaderboard = useMemo(() => {
