@@ -1184,14 +1184,24 @@
         if (!isFinished) {
           const pRound = normalizeRound(p.round);
           const key = `${normalizeTeamName(p.team1)}_${normalizeTeamName(p.team2)}_${pRound}`;
-          if (!matchMap[key]) matchMap[key] = { team1: p.team1, team2: p.team2, round: pRound, h:0, d:0, a:0, total:0 };
+          if (!matchMap[key]) matchMap[key] = { team1: p.team1, team2: p.team2, round: pRound, h:0, d:0, a:0, total:0, scores: {} };
           matchMap[key].total++;
           if (p.score1 > p.score2) matchMap[key].h++;
           else if (p.score1 < p.score2) matchMap[key].a++;
           else matchMap[key].d++;
+          const scoreKey = `${p.score1}-${p.score2}`;
+          matchMap[key].scores[scoreKey] = (matchMap[key].scores[scoreKey] || 0) + 1;
         }
       });
-      return Object.values(matchMap).sort((a,b) => b.total - a.total);
+      // Surface the crowd's single most-picked exact scoreline per match
+      // (ties broken by whichever was seen first) alongside the win/draw/win split.
+      return Object.values(matchMap).map(m => {
+        let topScore = null, topCount = 0;
+        Object.entries(m.scores).forEach(([score, count]) => {
+          if (count > topCount) { topScore = score; topCount = count; }
+        });
+        return { ...m, topScore, topCount };
+      }).sort((a,b) => b.total - a.total);
     }, [predictions, realResults]);
 
     const handleAddResult = (e) => {
@@ -1260,6 +1270,16 @@
                       <span className="text-gray-400 text-sm">vs</span>
                       <span className="flex items-center gap-2 text-gray-800">{m.team2} {getFlagEmoji(m.team2)}</span>
                     </div>
+
+                    {m.topScore && (
+                      <div className="text-center mb-2">
+                        <span className="inline-flex items-center gap-1.5 bg-[#1B4D3E]/5 border border-[#1B4D3E]/20 text-[#1B4D3E] text-xs font-bold px-2.5 py-0.5 rounded-full">
+                          Most picked {m.topScore}
+                          <span className="text-gray-400 font-normal">· {m.topCount}/{m.total}</span>
+                        </span>
+                      </div>
+                    )}
+
                     <div className="text-center text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">{m.round} <span className="text-[#D4AF37]">· click to log result</span></div>
 
                     {/* Split Bar */}
