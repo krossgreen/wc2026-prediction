@@ -1193,14 +1193,11 @@
           matchMap[key].scores[scoreKey] = (matchMap[key].scores[scoreKey] || 0) + 1;
         }
       });
-      // Surface the crowd's single most-picked exact scoreline per match
-      // (ties broken by whichever was seen first) alongside the win/draw/win split.
+      // Surface every exact scoreline the crowd picked, most-popular first
+      // (ties broken by whichever was seen first), alongside the win/draw/win split.
       return Object.values(matchMap).map(m => {
-        let topScore = null, topCount = 0;
-        Object.entries(m.scores).forEach(([score, count]) => {
-          if (count > topCount) { topScore = score; topCount = count; }
-        });
-        return { ...m, topScore, topCount };
+        const scoreEntries = Object.entries(m.scores).sort((a, b) => b[1] - a[1]);
+        return { ...m, scoreEntries };
       }).sort((a,b) => b.total - a.total);
     }, [predictions, realResults]);
 
@@ -1271,12 +1268,18 @@
                       <span className="flex items-center gap-2 text-gray-800">{m.team2} {getFlagEmoji(m.team2)}</span>
                     </div>
 
-                    {m.topScore && (
-                      <div className="text-center mb-2">
-                        <span className="inline-flex items-center gap-1.5 bg-[#1B4D3E]/5 border border-[#1B4D3E]/20 text-[#1B4D3E] text-xs font-bold px-2.5 py-0.5 rounded-full">
-                          Most picked {m.topScore}
-                          <span className="text-gray-400 font-normal">· {m.topCount}/{m.total}</span>
-                        </span>
+                    {m.scoreEntries.length > 0 && (
+                      <div className="flex flex-wrap justify-center gap-1.5 mb-2">
+                        {m.scoreEntries.slice(0, 3).map(([score, count]) => (
+                          <span key={score} className="inline-flex items-center gap-1 bg-[#1B4D3E]/5 border border-[#1B4D3E]/20 text-[#1B4D3E] text-xs font-bold px-2 py-0.5 rounded-full">
+                            {score} <span className="text-gray-400 font-normal">×{count}</span>
+                          </span>
+                        ))}
+                        {m.scoreEntries.length > 3 && (
+                          <span className="inline-flex items-center text-xs font-bold text-gray-400 px-1.5 py-0.5">
+                            +{m.scoreEntries.length - 3} more
+                          </span>
+                        )}
                       </div>
                     )}
 
