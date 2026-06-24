@@ -741,21 +741,58 @@
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
 
-        {/* View Mode Toggle */}
-        <div className="flex gap-2 font-oswald">
-          {[{ id: 'tickets', label: 'By Player' }, { id: 'matrix', label: 'Coverage Matrix' }].map(m => (
-            <button
-              key={m.id}
-              onClick={() => setViewMode(m.id)}
-              className={`px-4 py-2 text-sm rounded-full font-bold tracking-wider transition-all shadow-sm border-2 ${
-                viewMode === m.id
-                  ? 'bg-[#D4AF37] text-[#1B4D3E] border-[#D4AF37]'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-[#D4AF37] hover:text-[#1B4D3E]'
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
+        {/* Control bar: view mode + (in tickets view) player search, grouped
+            into one pill matching the leaderboard's settings treatment.
+            Gold = which view you're looking at; green (the tabs below) = which
+            player is selected. */}
+        <div className="flex flex-wrap items-center gap-4 sm:gap-5 bg-gray-50 border-2 border-gray-200 rounded-2xl px-4 py-2.5">
+          <div className="flex items-center gap-2 font-oswald">
+            <span className="text-xs font-bold uppercase tracking-wider text-gray-500">View</span>
+            <div className="flex gap-1">
+              {[{ id: 'tickets', label: 'By Player' }, { id: 'matrix', label: 'Coverage Matrix' }].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setViewMode(m.id)}
+                  className={`px-3 py-1.5 text-sm rounded-full font-bold tracking-wider transition-all ${
+                    viewMode === m.id
+                      ? 'bg-[#D4AF37] text-[#1B4D3E]'
+                      : 'text-gray-500 hover:text-[#1B4D3E]'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {viewMode === 'tickets' && (
+            <>
+              <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
+              <div className="flex items-center gap-2 font-oswald flex-1 min-w-[180px]">
+                <label htmlFor="player-search" className="text-xs font-bold uppercase tracking-wider text-gray-500">Player</label>
+                <div className="relative flex-1 max-w-xs">
+                  <input
+                    id="player-search"
+                    type="text"
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    placeholder="Search players…"
+                    className="w-full bg-white border-2 border-gray-200 rounded-full pl-4 pr-9 py-1.5 text-sm font-oswald font-bold tracking-wide outline-none focus:border-[#D4AF37] text-gray-700"
+                  />
+                  {playerSearch && (
+                    <button
+                      onClick={() => setPlayerSearch('')}
+                      title="Clear search"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-lg leading-none px-1"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {viewMode === 'matrix' && (
@@ -764,27 +801,6 @@
 
         {viewMode === 'tickets' && (
         <>
-        {/* Player Search */}
-        <div className="relative max-w-xs">
-          <input
-            type="text"
-            value={playerSearch}
-            onChange={(e) => setPlayerSearch(e.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="Search players…"
-            className="w-full border-2 border-gray-200 rounded-full pl-4 pr-9 py-2 text-sm font-oswald font-bold tracking-wide outline-none focus:border-[#D4AF37] text-gray-700"
-          />
-          {playerSearch && (
-            <button
-              onClick={() => setPlayerSearch('')}
-              title="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 font-bold text-lg leading-none px-1"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
         {/* Player Selector Tabs */}
         {filteredUsers.length > 0 ? (
           <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide font-oswald">
