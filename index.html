@@ -289,6 +289,8 @@
     // stat decides the placing first. 'exact-first' (more exact scores wins)
     // is the default criteria.
     const [tiebreakMode, setTiebreakMode] = useState('exact-first');
+    // How many recent results show up as dots in the leaderboard's FORM column.
+    const [formCount, setFormCount] = useState(6);
 
     // --- Score Calculation ---
     const leaderboard = useMemo(() => {
@@ -315,7 +317,7 @@
           }
         });
 
-        return { ...user, totalPoints, exactMatches, correctOutcomes, userPreds, form: form.slice(-5), completedPicks };
+        return { ...user, totalPoints, exactMatches, correctOutcomes, userPreds, form: form.slice(-formCount), completedPicks };
       });
 
       const tiebreak = (a, b) => {
@@ -376,7 +378,7 @@
       });
 
       return stats;
-    }, [users, predictions, realResults, tiebreakMode]);
+    }, [users, predictions, realResults, tiebreakMode, formCount]);
 
     // --- Main Render ---
     return (
@@ -423,7 +425,7 @@
         {/* Main Content Area */}
         <main className="max-w-6xl mx-auto p-6 min-h-[80vh]">
           {activeTab === 'leaderboard' && (
-            <LeaderboardView leaderboard={leaderboard} realResults={realResults} tiebreakMode={tiebreakMode} setTiebreakMode={setTiebreakMode} />
+            <LeaderboardView leaderboard={leaderboard} realResults={realResults} tiebreakMode={tiebreakMode} setTiebreakMode={setTiebreakMode} formCount={formCount} setFormCount={setFormCount} />
           )}
           {activeTab === 'user-picks' && (
             <UserPicksView
@@ -464,7 +466,7 @@
 
   // --- VIEWS ---
 
-  function LeaderboardView({ leaderboard, realResults, tiebreakMode, setTiebreakMode }) {
+  function LeaderboardView({ leaderboard, realResults, tiebreakMode, setTiebreakMode, formCount, setFormCount }) {
     const podiumRank1 = leaderboard.filter(u => u.rank === 1);
     const podiumRank2 = leaderboard.filter(u => u.rank === 2);
     const podiumRank3 = leaderboard.filter(u => u.rank === 3);
@@ -530,6 +532,21 @@
               <option value="picks-first">Points → Picks (less) → Exact (more)</option>
               <option value="exact-first">Points → Exact (more) → Picks (less)</option>
             </select>
+          </div>
+          <div className="flex items-center gap-2 font-oswald">
+            <label htmlFor="form-count-slider" className="text-xs font-bold uppercase tracking-wider text-gray-500">Form</label>
+            <input
+              id="form-count-slider"
+              type="range"
+              min="3"
+              max="10"
+              step="1"
+              value={formCount}
+              onChange={(e) => setFormCount(Number(e.target.value))}
+              title="Number of recent results shown as dots in the FORM column"
+              className="w-28 accent-[#1B4D3E] cursor-pointer"
+            />
+            <span className="text-sm font-bold text-[#1B4D3E] w-5 text-center">{formCount}</span>
           </div>
           <button
             onClick={exportStandings}
