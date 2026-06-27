@@ -74,7 +74,8 @@
     Activity = _makeIcon('Activity'), CheckCircle = _makeIcon('CheckCircle'),
     ShieldAlert = _makeIcon('ShieldAlert'), Award = _makeIcon('Award'), Star = _makeIcon('Star'),
     Download = _makeIcon('Download'), Upload = _makeIcon('Upload'), Crown = _makeIcon('Crown'),
-    Medal = _makeIcon('Medal'), Users = _makeIcon('Users');
+    Medal = _makeIcon('Medal'), Users = _makeIcon('Users'),
+    Pencil = _makeIcon('Pencil'), Trash2 = _makeIcon('Trash2'), Check = _makeIcon('Check'), X = _makeIcon('X');
 
   // --- CSS Enhancements (Foil, Fonts, Tickets, Ledger, Metal) ---
   const customStyles = `
@@ -433,6 +434,7 @@
             <UserPicksView
               users={users}
               predictions={predictions}
+              setPredictions={setPredictions}
               realResults={realResults}
             />
           )}
@@ -723,10 +725,14 @@
     );
   }
 
-  function UserPicksView({ users, predictions, realResults }) {
+  function UserPicksView({ users, predictions, setPredictions, realResults }) {
     const [selectedUser, setSelectedUser] = useState(users[0]?.id || null);
     const [viewMode, setViewMode] = useState('tickets');
     const [playerSearch, setPlayerSearch] = useState('');
+    // Inline edit state for a single ticket's scoreline.
+    const [editingId, setEditingId] = useState(null);
+    const [editS1, setEditS1] = useState('');
+    const [editS2, setEditS2] = useState('');
 
     const activeUser = users.find(u => u.id === selectedUser);
     const userPreds = predictions.filter(p => p.userId === selectedUser);
@@ -736,6 +742,27 @@
       if (e.key === 'Enter' && filteredUsers.length > 0) {
         setSelectedUser(filteredUsers[0].id);
       }
+    };
+
+    const startEdit = (pred) => {
+      setEditingId(pred.id);
+      setEditS1(String(pred.score1));
+      setEditS2(String(pred.score2));
+    };
+    const cancelEdit = () => setEditingId(null);
+    const saveEdit = () => {
+      if (editS1 === '' || editS2 === '') return;
+      setPredictions(prev => prev.map(p =>
+        p.id === editingId
+          ? { ...p, score1: parseInt(editS1, 10), score2: parseInt(editS2, 10) }
+          : p
+      ));
+      setEditingId(null);
+    };
+    const deletePick = (pred) => {
+      if (!window.confirm(`Delete ${pred.team1} ${pred.score1}-${pred.score2} ${pred.team2}?`)) return;
+      setPredictions(prev => prev.filter(p => p.id !== pred.id));
+      if (editingId === pred.id) setEditingId(null);
     };
 
     return (
@@ -862,9 +889,28 @@
                       {/* Score Box */}
                       <div className="flex flex-col items-center px-2 sm:px-4 w-28 sm:w-36 z-10">
                         <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{normalizeRound(pred.round)}</div>
-                        <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
-                          {pred.score1} - {pred.score2}
-                        </div>
+                        {editingId === pred.id ? (
+                          <div className="flex items-center gap-1 w-full justify-center">
+                            <input
+                              type="number" min="0" value={editS1}
+                              onChange={e => setEditS1(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                              autoFocus
+                              className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
+                            />
+                            <span className="text-gray-400 font-bold">-</span>
+                            <input
+                              type="number" min="0" value={editS2}
+                              onChange={e => setEditS2(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                              className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
+                            />
+                          </div>
+                        ) : (
+                          <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
+                            {pred.score1} - {pred.score2}
+                          </div>
+                        )}
                         {real ? (
                           <div className="text-[10px] sm:text-xs text-gray-500 mt-1.5 font-bold uppercase tracking-wider text-center">
                             Actual: {real.score1}-{real.score2}
@@ -874,6 +920,20 @@
                             Kickoff Pending
                           </div>
                         )}
+                        {/* Edit / delete (or save / cancel while editing) */}
+                        <div className="flex items-center gap-1 mt-2">
+                          {editingId === pred.id ? (
+                            <>
+                              <button onClick={saveEdit} title="Save" className="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-1.5 rounded"><Check size={16} /></button>
+                              <button onClick={cancelEdit} title="Cancel" className="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 p-1.5 rounded"><X size={16} /></button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => startEdit(pred)} title="Edit score" className="text-gray-400 hover:text-[#1B4D3E] bg-gray-50 hover:bg-gray-100 p-1.5 rounded"><Pencil size={14} /></button>
+                              <button onClick={() => deletePick(pred)} title="Delete pick" className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded"><Trash2 size={14} /></button>
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {/* Away Team */}
