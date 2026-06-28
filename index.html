@@ -184,6 +184,11 @@
   // A prediction/result with no round set predates this field — treat it as
   // Group Stage so old/imported data keeps matching exactly as before.
   const normalizeRound = (round) => round || 'Group Stage';
+  // Every round except the group stage is a knockout — a level score there is
+  // settled by a penalty shootout, so those fixtures carry a `penWinner`.
+  const isKnockoutRound = (round) => normalizeRound(round) !== 'Group Stage';
+  // The team name behind a fixture's penWinner ('team1' | 'team2'), or null.
+  const penWinnerTeam = (m) => !m || !m.penWinner ? null : (m.penWinner === 'team1' ? m.team1 : m.team2);
 
   // Two fixtures (a prediction, a logged result, or a coverage-matrix row —
   // anything with team1/team2/round) are the same real-world match only if
@@ -233,6 +238,15 @@
 
   const calculatePoints = (pred, real) => {
     if (!real) return 0;
+    // Knockout that went to penalties: the recorded 120-min score is level and
+    // a shootout winner is set. Full marks need the exact level score AND the
+    // right team through; merely calling the draw is still the outcome point.
+    if (isKnockoutRound(real.round) && real.score1 === real.score2 && real.penWinner) {
+      const predDraw = pred.score1 === pred.score2;
+      if (predDraw && pred.score1 === real.score1 && pred.penWinner === real.penWinner) return 3;
+      if (predDraw) return 1;
+      return 0;
+    }
     if (pred.score1 === real.score1 && pred.score2 === real.score2) return 3;
     const predDiff = pred.score1 - pred.score2;
     const realDiff = real.score1 - real.score2;
@@ -733,6 +747,7 @@
     const [editingId, setEditingId] = useState(null);
     const [editS1, setEditS1] = useState('');
     const [editS2, setEditS2] = useState('');
+    const [editPen, setEditPen] = useState(null);
 
     const activeUser = users.find(u => u.id === selectedUser);
     const userPreds = predictions.filter(p => p.userId === selectedUser);
@@ -748,15 +763,23 @@
       setEditingId(pred.id);
       setEditS1(String(pred.score1));
       setEditS2(String(pred.score2));
+      setEditPen(pred.penWinner || null);
     };
     const cancelEdit = () => setEditingId(null);
     const saveEdit = () => {
       if (editS1 === '' || editS2 === '') return;
-      setPredictions(prev => prev.map(p =>
-        p.id === editingId
-          ? { ...p, score1: parseInt(editS1, 10), score2: parseInt(editS2, 10) }
-          : p
-      ));
+      const s1n = parseInt(editS1, 10), s2n = parseInt(editS2, 10);
+      const target = predictions.find(p => p.id === editingId);
+      const koDraw = target && isKnockoutRound(target.round) && s1n === s2n;
+      // A knockout draw must keep a pens winner; block save until one's chosen.
+      if (koDraw && !editPen) return;
+      setPredictions(prev => prev.map(p => {
+        if (p.id !== editingId) return p;
+        const next = { ...p, score1: s1n, score2: s2n };
+        if (koDraw) next.penWinner = editPen;
+        else delete next.penWinner;
+        return next;
+      }));
       setEditingId(null);
     };
     const deletePick = (pred) => {
@@ -890,30 +913,55 @@
                       <div className="flex flex-col items-center px-2 sm:px-4 w-28 sm:w-36 z-10">
                         <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{normalizeRound(pred.round)}</div>
                         {editingId === pred.id ? (
-                          <div className="flex items-center gap-1 w-full justify-center">
-                            <input
-                              type="number" min="0" value={editS1}
-                              onChange={e => setEditS1(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
-                              autoFocus
-                              className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
-                            />
-                            <span className="text-gray-400 font-bold">-</span>
-                            <input
-                              type="number" min="0" value={editS2}
-                              onChange={e => setEditS2(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
-                              className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
-                            />
-                          </div>
+                          <>
+                            <div className="flex items-center gap-1 w-full justify-center">
+                              <input
+                                type="number" min="0" value={editS1}
+                                onChange={e => setEditS1(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                                autoFocus
+                                className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
+                              />
+                              <span className="text-gray-400 font-bold">-</span>
+                              <input
+                                type="number" min="0" value={editS2}
+                                onChange={e => setEditS2(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+                                className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
+                              />
+                            </div>
+                            {isKnockoutRound(pred.round) && editS1 !== '' && editS2 !== '' && parseInt(editS1, 10) === parseInt(editS2, 10) && (
+                              <div className="flex flex-col items-center gap-1 mt-1.5">
+                                <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">Wins on pens</span>
+                                <div className="flex gap-1 flex-wrap justify-center">
+                                  {['team1', 'team2'].map(side => (
+                                    <button
+                                      key={side} type="button" onClick={() => setEditPen(side)}
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                                        editPen === side ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#D4AF37]'
+                                      }`}
+                                    >
+                                      {side === 'team1' ? pred.team1 : pred.team2}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
                         ) : (
-                          <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
-                            {pred.score1} - {pred.score2}
-                          </div>
+                          <>
+                            <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
+                              {pred.score1} - {pred.score2}
+                            </div>
+                            {isKnockoutRound(pred.round) && pred.score1 === pred.score2 && penWinnerTeam(pred) && (
+                              <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-[#D4AF37] mt-1 text-center">{penWinnerTeam(pred)} pens</span>
+                            )}
+                          </>
                         )}
                         {real ? (
                           <div className="text-[10px] sm:text-xs text-gray-500 mt-1.5 font-bold uppercase tracking-wider text-center">
                             Actual: {real.score1}-{real.score2}
+                            {penWinnerTeam(real) && <span className="block text-[#D4AF37]">{penWinnerTeam(real)} pens</span>}
                           </div>
                         ) : (
                           <div className="text-[9px] sm:text-[10px] text-[#D4AF37] mt-1.5 font-bold uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded text-center border border-amber-200">
@@ -1060,9 +1108,15 @@
     const [rawText, setRawText] = useState('');
     const [parsedResults, setParsedResults] = useState([]);
     const [selectedRound, setSelectedRound] = useState('Group Stage');
+    // For a knockout draw prediction we also need who the player thinks wins on
+    // pens; keyed by the parsed result's index ('team1' | 'team2').
+    const [penPicks, setPenPicks] = useState({});
+
+    const selectedRoundIsKO = isKnockoutRound(selectedRound);
 
     // Real-time parsing logic
     useEffect(() => {
+      setPenPicks({});
       if (!rawText.trim()) {
         setParsedResults([]);
         return;
@@ -1102,14 +1156,22 @@
       setNewUserName('');
     };
 
+    // A knockout draw prediction must say who wins on pens before it can be saved.
+    const missingPens = selectedRoundIsKO &&
+      parsedResults.some((p, i) => p.score1 === p.score2 && !penPicks[i]);
+
     const handleSavePicks = () => {
-      if (parsedResults.length === 0 || !selectedUserId) return;
-      const newPreds = parsedResults.map(p => ({
-        id: `p${Date.now()}_${Math.random()}`,
-        userId: selectedUserId,
-        round: selectedRound,
-        ...p
-      }));
+      if (parsedResults.length === 0 || !selectedUserId || missingPens) return;
+      const newPreds = parsedResults.map((p, i) => {
+        const pred = {
+          id: `p${Date.now()}_${Math.random()}`,
+          userId: selectedUserId,
+          round: selectedRound,
+          ...p
+        };
+        if (selectedRoundIsKO && p.score1 === p.score2) pred.penWinner = penPicks[i];
+        return pred;
+      });
       setPredictions(prev => [...prev, ...newPreds]);
       setRawText('');
       alert("Picks saved successfully!");
@@ -1198,19 +1260,44 @@
 
               {parsedResults.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                  {parsedResults.map((p, i) => (
-                    <div key={i} className="flex justify-between items-center bg-white p-3 rounded shadow-sm border border-gray-200">
-                      <span className="font-bold flex items-center gap-2">
-                        {getFlagEmoji(p.team1)} {p.team1}
-                      </span>
-                      <span className="bg-[#1B4D3E] text-white font-vt323 text-xl px-3 py-1 rounded">
-                        {p.score1} - {p.score2}
-                      </span>
-                      <span className="font-bold flex items-center gap-2">
-                        {p.team2} {getFlagEmoji(p.team2)}
-                      </span>
+                  {parsedResults.map((p, i) => {
+                    const isDraw = p.score1 === p.score2;
+                    const needsPen = selectedRoundIsKO && isDraw;
+                    return (
+                    <div key={i} className="bg-white p-3 rounded shadow-sm border border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold flex items-center gap-2">
+                          {getFlagEmoji(p.team1)} {p.team1}
+                        </span>
+                        <span className="bg-[#1B4D3E] text-white font-vt323 text-xl px-3 py-1 rounded">
+                          {p.score1} - {p.score2}
+                        </span>
+                        <span className="font-bold flex items-center gap-2">
+                          {p.team2} {getFlagEmoji(p.team2)}
+                        </span>
+                      </div>
+                      {needsPen && (
+                        <div className="mt-2 pt-2 border-t border-dashed border-gray-200 flex items-center justify-center gap-2 flex-wrap">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Wins on pens</span>
+                          {['team1', 'team2'].map(side => (
+                            <button
+                              key={side}
+                              type="button"
+                              onClick={() => setPenPicks(prev => ({ ...prev, [i]: side }))}
+                              className={`text-xs font-bold px-3 py-1 rounded-full border-2 transition-all ${
+                                penPicks[i] === side
+                                  ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]'
+                                  : 'bg-white text-gray-500 border-gray-200 hover:border-[#D4AF37]'
+                              }`}
+                            >
+                              {side === 'team1' ? p.team1 : p.team2}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center text-gray-400 py-4 flex flex-col items-center gap-2">
@@ -1219,9 +1306,14 @@
                 </div>
               )}
 
+              {missingPens && (
+                <p className="text-center text-xs font-bold text-red-500 mb-2">
+                  Pick who wins on penalties for each drawn knockout tie above.
+                </p>
+              )}
               <button
                 onClick={handleSavePicks}
-                disabled={parsedResults.length === 0}
+                disabled={parsedResults.length === 0 || missingPens}
                 className="w-full flex items-center justify-center gap-2 bg-[#D4AF37] text-[#1B4D3E] font-oswald text-lg uppercase tracking-widest py-3 rounded hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
               >
                 <Save size={20} /> Print {parsedResults.length} Tickets to Album
@@ -1240,7 +1332,11 @@
     const [s2, setS2] = useState('');
     const [date, setDate] = useState(todayStr());
     const [round, setRound] = useState('Group Stage');
+    const [penWinner, setPenWinner] = useState(null);
     const score1Ref = useRef(null);
+
+    // A knockout tie level at 120 min is settled on pens, so we need the winner.
+    const resultNeedsPen = isKnockoutRound(round) && s1 !== '' && s2 !== '' && parseInt(s1, 10) === parseInt(s2, 10);
 
     // Crowd Consensus cards are clickable: fill in the teams/round below
     // instead of retyping them, then jump straight to the score inputs.
@@ -1248,6 +1344,7 @@
       setT1(m.team1);
       setT2(m.team2);
       setRound(m.round);
+      setPenWinner(null);
       score1Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       score1Ref.current?.focus();
     };
@@ -1280,6 +1377,7 @@
     const handleAddResult = (e) => {
       e.preventDefault();
       if (!t1 || !t2 || s1 === '' || s2 === '' || !date) return;
+      if (resultNeedsPen && !penWinner) return;
 
       const newResult = {
         id: `r${Date.now()}`,
@@ -1290,6 +1388,7 @@
         score1: parseInt(s1, 10),
         score2: parseInt(s2, 10)
       };
+      if (resultNeedsPen) newResult.penWinner = penWinner;
 
       // Only replaces a result for the same team pair AND round (fixing a
       // typo on that match) — a different round with the same two teams
@@ -1297,7 +1396,7 @@
       const filtered = realResults.filter(r => !sameFixture(r, newResult));
 
       setRealResults([...filtered, newResult]);
-      setT1(''); setT2(''); setS1(''); setS2('');
+      setT1(''); setT2(''); setS1(''); setS2(''); setPenWinner(null);
     };
 
     const removeResult = (id) => {
@@ -1439,6 +1538,26 @@
                 Save
               </button>
             </div>
+
+            {resultNeedsPen && (
+              <div className="flex items-center gap-3 mt-4 pl-8 relative z-20 flex-wrap">
+                <label className="font-oswald uppercase tracking-widest text-xs font-bold text-gray-500">Wins on penalties</label>
+                {[{ side: 'team1', name: t1 }, { side: 'team2', name: t2 }].map(({ side, name }) => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setPenWinner(side)}
+                    className={`font-caveat text-lg font-bold px-4 py-1 rounded-full border-2 transition-all ${
+                      penWinner === side
+                        ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]'
+                        : 'bg-white/70 text-gray-600 border-gray-400 hover:border-[#D4AF37]'
+                    }`}
+                  >
+                    {name || (side === 'team1' ? 'Home' : 'Away')}
+                  </button>
+                ))}
+              </div>
+            )}
           </form>
 
           <div>
@@ -1472,6 +1591,11 @@
                           <div className="px-4 bg-black text-white font-vt323 text-3xl py-1 rounded shadow-inner">
                             {r.score1} - {r.score2}
                           </div>
+                          {penWinnerTeam(r) && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-[#D4AF37] mt-1 text-center">
+                              {penWinnerTeam(r)} win on pens
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex-1 font-bold flex items-center gap-2 text-gray-800 min-w-0">
