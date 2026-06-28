@@ -266,6 +266,18 @@
     if (isNaN(dt)) return d;
     return dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   };
+  // Short "how long ago" label for an epoch-ms timestamp, e.g. "3m ago".
+  const relativeTime = (ts) => {
+    if (!ts) return '';
+    const s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 45) return 'just now';
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    return d === 1 ? 'yesterday' : `${d}d ago`;
+  };
 
   // --- Initial Mock Data ---
   const initialUsers = [
@@ -456,6 +468,7 @@
             <PredictionsView
               users={users}
               setUsers={setUsers}
+              predictions={predictions}
               setPredictions={setPredictions}
             />
           )}
@@ -775,7 +788,7 @@
       if (koDraw && !editPen) return;
       setPredictions(prev => prev.map(p => {
         if (p.id !== editingId) return p;
-        const next = { ...p, score1: s1n, score2: s2n };
+        const next = { ...p, score1: s1n, score2: s2n, ts: Date.now(), edited: true };
         if (koDraw) next.penWinner = editPen;
         else delete next.penWinner;
         return next;
@@ -1102,7 +1115,15 @@
     );
   }
 
-  function PredictionsView({ users, setUsers, setPredictions }) {
+  function PredictionsView({ users, setUsers, predictions, setPredictions }) {
+    // Most-recently added or edited picks, newest first — a running log so you
+    // can see what's just been entered and where to pick up adding from.
+    const userName = (id) => (users.find(u => u.id === id) || {}).name || 'Unknown';
+    const recentPicks = predictions
+      .filter(p => p.ts)
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 10);
+
     const [selectedUserId, setSelectedUserId] = useState(users[0]?.id || '');
     const [newUserName, setNewUserName] = useState('');
     const [rawText, setRawText] = useState('');
@@ -1167,6 +1188,7 @@
           id: `p${Date.now()}_${Math.random()}`,
           userId: selectedUserId,
           round: selectedRound,
+          ts: Date.now(),
           ...p
         };
         if (selectedRoundIsKO && p.score1 === p.score2) pred.penWinner = penPicks[i];
@@ -1321,6 +1343,36 @@
             </div>
           )}
         </div>
+
+        {recentPicks.length > 0 && (
+          <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-[#e5e7eb]">
+            <h2 className="text-xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] mb-1 flex items-center gap-2">
+              <Activity size={20} /> Recently Added / Updated
+            </h2>
+            <p className="text-xs text-gray-400 mb-4">Your last {recentPicks.length} entered picks — a quick check on where you left off.</p>
+            <div className="space-y-1.5">
+              {recentPicks.map(p => (
+                <div key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
+                    p.edited ? 'bg-amber-100 text-amber-700' : 'bg-[#1B4D3E]/10 text-[#1B4D3E]'
+                  }`}>
+                    {p.edited ? 'Updated' : 'Added'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-gray-800 text-sm truncate">{userName(p.userId)}</div>
+                    <div className="text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+                      <span className="truncate">{p.team1} {p.score1}-{p.score2} {p.team2}</span>
+                      {penWinnerTeam(p) && <span className="text-[#D4AF37] font-bold">· {penWinnerTeam(p)} pens</span>}
+                      <span className="text-gray-300">·</span>
+                      <span className="uppercase tracking-wider text-gray-400">{normalizeRound(p.round)}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">{relativeTime(p.ts)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
