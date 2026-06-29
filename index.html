@@ -200,6 +200,22 @@
     normalizeTeamName(a.team2) === normalizeTeamName(b.team2) &&
     normalizeRound(a.round) === normalizeRound(b.round);
 
+  // Sets of 2+ predictions by the same player for the same match — accidental
+  // double-entries to clean up. Teams are matched in either order (so a
+  // reversed "France vs Brazil" / "Brazil vs France" re-paste is caught too),
+  // within the same round. Returned newest-first within each group.
+  const findDuplicateGroups = (predictions) => {
+    const map = {};
+    predictions.forEach(p => {
+      const teams = [normalizeTeamName(p.team1), normalizeTeamName(p.team2)].sort().join('_');
+      const key = `${p.userId}|${teams}|${normalizeRound(p.round)}`;
+      (map[key] = map[key] || []).push(p);
+    });
+    return Object.values(map)
+      .filter(g => g.length > 1)
+      .map(g => [...g].sort((a, b) => (b.ts || 0) - (a.ts || 0)));
+  };
+
   // normalizedTeamName -> ISO 3166-1 alpha-2 (for flagcdn images). Covers the
   // realistic World Cup field; anything unmapped falls back to a lettered chip.
   const TEAM_ISO = {
@@ -765,6 +781,7 @@
     const activeUser = users.find(u => u.id === selectedUser);
     const userPreds = predictions.filter(p => p.userId === selectedUser);
     const filteredUsers = users.filter(u => u.name.toLowerCase().includes(playerSearch.trim().toLowerCase()));
+    const dupCount = findDuplicateGroups(predictions).length;
 
     const handleSearchKeyDown = (e) => {
       if (e.key === 'Enter' && filteredUsers.length > 0) {
@@ -812,17 +829,20 @@
           <div className="flex items-center gap-2 font-oswald">
             <span className="text-xs font-bold uppercase tracking-wider text-gray-500">View</span>
             <div className="flex gap-1">
-              {[{ id: 'tickets', label: 'By Player' }, { id: 'matrix', label: 'Coverage Matrix' }].map(m => (
+              {[{ id: 'tickets', label: 'By Player' }, { id: 'matrix', label: 'Coverage Matrix' }, { id: 'duplicates', label: 'Duplicates' }].map(m => (
                 <button
                   key={m.id}
                   onClick={() => setViewMode(m.id)}
-                  className={`px-3 py-1.5 text-sm rounded-full font-bold tracking-wider transition-all ${
+                  className={`px-3 py-1.5 text-sm rounded-full font-bold tracking-wider transition-all flex items-center gap-1.5 ${
                     viewMode === m.id
                       ? 'bg-[#D4AF37] text-[#1B4D3E]'
                       : 'text-gray-500 hover:text-[#1B4D3E]'
                   }`}
                 >
                   {m.label}
+                  {m.id === 'duplicates' && dupCount > 0 && (
+                    <span className="bg-red-500 text-white text-[10px] font-bold leading-none px-1.5 py-0.5 rounded-full">{dupCount}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -860,6 +880,10 @@
 
         {viewMode === 'matrix' && (
           <CoverageMatrixView users={users} predictions={predictions} realResults={realResults} />
+        )}
+
+        {viewMode === 'duplicates' && (
+          <DuplicatesView users={users} predictions={predictions} setPredictions={setPredictions} />
         )}
 
         {viewMode === 'tickets' && (
@@ -1111,6 +1135,66 @@
             })}
           </tbody>
         </table>
+      </div>
+    );
+  }
+
+  // Duplicate check: surfaces any player who has more than one prediction for
+  // the same match, so accidental double-pastes can be deleted down to one.
+  function DuplicatesView({ users, predictions, setPredictions }) {
+    const userName = (id) => (users.find(u => u.id === id) || {}).name || 'Unknown';
+    const groups = useMemo(() => findDuplicateGroups(predictions), [predictions]);
+
+    const removePick = (p) => {
+      if (!window.confirm(`Delete ${userName(p.userId)}'s pick — ${p.team1} ${p.score1}-${p.score2} ${p.team2}?`)) return;
+      setPredictions(prev => prev.filter(x => x.id !== p.id));
+    };
+
+    if (groups.length === 0) {
+      return (
+        <div className="bg-white rounded-lg border-2 border-green-200 p-8 text-center animate-in fade-in duration-300">
+          <CheckCircle size={40} className="text-green-500 mx-auto mb-3" />
+          <p className="font-oswald font-bold uppercase tracking-wide text-[#1B4D3E]">No duplicate picks</p>
+          <p className="text-sm text-gray-500 mt-1">Every player has at most one prediction per match.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4 animate-in fade-in duration-300">
+        <div className="flex items-center gap-2 bg-red-50 border-2 border-red-200 text-red-700 rounded-lg px-4 py-3">
+          <ShieldAlert size={20} className="shrink-0" />
+          <p className="text-sm font-bold">
+            {groups.length} match{groups.length === 1 ? '' : 'es'} {groups.length === 1 ? 'has' : 'have'} more than one pick from the same player. Delete the extras so each keeps just one.
+          </p>
+        </div>
+
+        {groups.map((g, i) => (
+          <div key={i} className="bg-white rounded-lg border-2 border-[#e5e7eb] shadow-sm overflow-hidden">
+            <div className="bg-gray-50 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between gap-2 flex-wrap">
+              <span className="font-oswald font-bold text-[#1B4D3E] flex items-center gap-2">
+                {getFlagEmoji(g[0].team1)} {g[0].team1} <span className="text-gray-400 font-normal text-sm">vs</span> {g[0].team2} {getFlagEmoji(g[0].team2)}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{userName(g[0].userId)} · {normalizeRound(g[0].round)} · {g.length} picks</span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {g.map(p => (
+                <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                  <span className="bg-[#1B4D3E] text-white font-vt323 text-lg px-2.5 py-0.5 rounded shrink-0">{p.score1} - {p.score2}</span>
+                  {penWinnerTeam(p) && <span className="text-xs font-bold text-[#D4AF37]">{penWinnerTeam(p)} pens</span>}
+                  <span className="text-xs text-gray-400 flex-1">{p.edited ? 'updated' : 'added'} {relativeTime(p.ts) || '— legacy'}</span>
+                  <button
+                    onClick={() => removePick(p)}
+                    title="Delete this pick"
+                    className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded shrink-0"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
