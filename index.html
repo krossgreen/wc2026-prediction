@@ -252,22 +252,42 @@
       className="inline-flex shrink-0 items-center justify-center h-[1em] min-w-[1.5em] px-1 rounded-[2px] bg-gray-300 text-gray-600 text-[0.5em] font-bold leading-none align-[-0.15em]">{code}</span>;
   };
 
-  const calculatePoints = (pred, real) => {
+  // Which side goes through in a knockout fixture: the higher score, or the
+  // shootout winner when it's level. Works for a prediction or a result.
+  const advancingSide = (m) => {
+    if (m.score1 > m.score2) return 'team1';
+    if (m.score2 > m.score1) return 'team2';
+    return m.penWinner || null;
+  };
+
+  // koScoreMode 'route' (default) additionally credits the outcome point for
+  // picking the team that actually advanced, however it got there (e.g. you
+  // predicted a 1-0 win but it was level and won on pens). 'strict' only
+  // rewards the predicted route. The full 3 (exact score + right pens winner)
+  // and group-stage scoring are identical in both modes.
+  const calculatePoints = (pred, real, koScoreMode = 'route') => {
     if (!real) return 0;
+    let pts;
     // Knockout that went to penalties: the recorded 120-min score is level and
     // a shootout winner is set. Full marks need the exact level score AND the
     // right team through; merely calling the draw is still the outcome point.
     if (isKnockoutRound(real.round) && real.score1 === real.score2 && real.penWinner) {
       const predDraw = pred.score1 === pred.score2;
-      if (predDraw && pred.score1 === real.score1 && pred.penWinner === real.penWinner) return 3;
-      if (predDraw) return 1;
-      return 0;
+      if (predDraw && pred.score1 === real.score1 && pred.penWinner === real.penWinner) pts = 3;
+      else if (predDraw) pts = 1;
+      else pts = 0;
+    } else if (pred.score1 === real.score1 && pred.score2 === real.score2) {
+      pts = 3;
+    } else if (Math.sign(pred.score1 - pred.score2) === Math.sign(real.score1 - real.score2)) {
+      pts = 1;
+    } else {
+      pts = 0;
     }
-    if (pred.score1 === real.score1 && pred.score2 === real.score2) return 3;
-    const predDiff = pred.score1 - pred.score2;
-    const realDiff = real.score1 - real.score2;
-    if (Math.sign(predDiff) === Math.sign(realDiff)) return 1;
-    return 0;
+    if (pts === 0 && koScoreMode === 'route' && isKnockoutRound(real.round)) {
+      const a = advancingSide(real), p = advancingSide(pred);
+      if (a && p && a === p) pts = 1;
+    }
+    return pts;
   };
 
   // Local YYYY-MM-DD for today (avoids UTC off-by-one from toISOString).
@@ -336,6 +356,9 @@
     const [formCount, setFormCount] = useState(6);
     // How many ranked rows the standings table shows. Infinity = show everyone (default).
     const [positionsCount, setPositionsCount] = useState(Infinity);
+    // Knockout pens scoring: 'route' credits the right team advancing by any
+    // route (default); 'strict' only credits the predicted route.
+    const [koScoreMode, setKoScoreMode] = useState('route');
 
     // --- Score Calculation ---
     const leaderboard = useMemo(() => {
@@ -354,7 +377,7 @@
 
           if (pred) {
             completedPicks++;
-            const pts = calculatePoints(pred, real);
+            const pts = calculatePoints(pred, real, koScoreMode);
             totalPoints += pts;
             if (pts === 3) exactMatches += 1;
             if (pts === 1) correctOutcomes += 1;
@@ -398,7 +421,7 @@
             const pred = preds.find(p => sameFixture(p, real));
             if (pred) {
               completedPicks++;
-              const pts = calculatePoints(pred, real);
+              const pts = calculatePoints(pred, real, koScoreMode);
               totalPoints += pts;
               if (pts === 3) exactMatches++; else if (pts === 1) correctOutcomes++;
             }
@@ -423,7 +446,7 @@
       });
 
       return stats;
-    }, [users, predictions, realResults, tiebreakMode, formCount]);
+    }, [users, predictions, realResults, tiebreakMode, formCount, koScoreMode]);
 
     // --- Main Render ---
     return (
@@ -470,7 +493,7 @@
         {/* Main Content Area */}
         <main className="max-w-6xl mx-auto p-6 min-h-[80vh]">
           {activeTab === 'leaderboard' && (
-            <LeaderboardView leaderboard={leaderboard} realResults={realResults} tiebreakMode={tiebreakMode} setTiebreakMode={setTiebreakMode} formCount={formCount} setFormCount={setFormCount} positionsCount={positionsCount} setPositionsCount={setPositionsCount} />
+            <LeaderboardView leaderboard={leaderboard} realResults={realResults} tiebreakMode={tiebreakMode} setTiebreakMode={setTiebreakMode} formCount={formCount} setFormCount={setFormCount} positionsCount={positionsCount} setPositionsCount={setPositionsCount} koScoreMode={koScoreMode} setKoScoreMode={setKoScoreMode} />
           )}
           {activeTab === 'user-picks' && (
             <UserPicksView
@@ -478,6 +501,7 @@
               predictions={predictions}
               setPredictions={setPredictions}
               realResults={realResults}
+              koScoreMode={koScoreMode}
             />
           )}
           {activeTab === 'predictions' && (
@@ -513,7 +537,7 @@
 
   // --- VIEWS ---
 
-  function LeaderboardView({ leaderboard, realResults, tiebreakMode, setTiebreakMode, formCount, setFormCount, positionsCount, setPositionsCount }) {
+  function LeaderboardView({ leaderboard, realResults, tiebreakMode, setTiebreakMode, formCount, setFormCount, positionsCount, setPositionsCount, koScoreMode, setKoScoreMode }) {
     const podiumRank1 = leaderboard.filter(u => u.rank === 1);
     const podiumRank2 = leaderboard.filter(u => u.rank === 2);
     const podiumRank3 = leaderboard.filter(u => u.rank === 3);
@@ -583,6 +607,22 @@
               >
                 <option value="picks-first">Points → Picks (less) → Exact (more)</option>
                 <option value="exact-first">Points → Exact (more) → Picks (less)</option>
+              </select>
+            </div>
+
+            <div className="hidden sm:block w-px h-6 bg-gray-300"></div>
+
+            <div className="flex items-center gap-2 font-oswald">
+              <label htmlFor="pens-select" className="text-xs font-bold uppercase tracking-wider text-gray-500">Pens</label>
+              <select
+                id="pens-select"
+                value={koScoreMode}
+                onChange={(e) => setKoScoreMode(e.target.value)}
+                title="How knockout penalty shootouts are scored when your predicted route differs from what happened"
+                className="text-sm font-bold text-[#1B4D3E] bg-white border-2 border-gray-200 rounded-full px-3 py-1.5 outline-none focus:border-[#D4AF37] cursor-pointer"
+              >
+                <option value="route">Right team through (any route)</option>
+                <option value="strict">Exact route only</option>
               </select>
             </div>
 
@@ -768,7 +808,7 @@
     );
   }
 
-  function UserPicksView({ users, predictions, setPredictions, realResults }) {
+  function UserPicksView({ users, predictions, setPredictions, realResults, koScoreMode }) {
     const [selectedUser, setSelectedUser] = useState(users[0]?.id || null);
     const [viewMode, setViewMode] = useState('tickets');
     const [playerSearch, setPlayerSearch] = useState('');
@@ -936,7 +976,7 @@
               <div className="space-y-4">
                 {userPreds.map(pred => {
                   const real = realResults.find(r => sameFixture(pred, r));
-                  const pts = calculatePoints(pred, real);
+                  const pts = calculatePoints(pred, real, koScoreMode);
 
                   return (
                     <div key={pred.id} className="vintage-ticket hover:-rotate-1 transition-transform duration-200 p-3 sm:p-4 border border-[#e5e7eb] flex flex-wrap sm:flex-nowrap justify-center sm:justify-between items-center gap-2 sm:gap-4">
