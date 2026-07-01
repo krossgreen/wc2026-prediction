@@ -382,6 +382,10 @@
             if (pts === 3) exactMatches += 1;
             if (pts === 1) correctOutcomes += 1;
             form.push(pts);
+          } else {
+            // Match happened but this player never predicted it — a grey gap
+            // in their form (doesn't count toward points or picks).
+            form.push(null);
           }
         });
 
@@ -771,9 +775,13 @@
                     <span className="truncate">{user.name}</span>
                   </div>
                   <div className="col-span-2 flex justify-center gap-1 md:gap-2 items-center">
-                    {user.form.length > 0 ? user.form.map((res, i) => (
-                      <span key={i} title={res === 3 ? 'Exact Score (3pt)' : res === 1 ? 'Outcome (1pt)' : 'Miss (0pt)'} className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${res === 3 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : res === 1 ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' : 'bg-red-600 border border-red-800'}`}></span>
-                    )) : <span className="text-lg text-gray-600">-</span>}
+                    {user.form.length > 0 ? user.form.map((res, i) => {
+                      const cfg = res === 3 ? { t: 'Exact Score (3pt)', c: 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' }
+                        : res === 1 ? { t: 'Outcome (1pt)', c: 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]' }
+                        : res === 0 ? { t: 'Miss (0pt)', c: 'bg-red-600 border border-red-800' }
+                        : { t: 'No pick', c: 'bg-gray-600 border border-gray-500' };
+                      return <span key={i} title={cfg.t} className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${cfg.c}`}></span>;
+                    }) : <span className="text-lg text-gray-600">-</span>}
                   </div>
                   <div className="col-span-1 text-center text-gray-300 bg-gray-900/40 py-1 rounded">{user.completedPicks}</div>
                   <div className="col-span-1 text-center text-green-400 bg-green-900/20 py-1 rounded">{user.exactMatches}</div>
