@@ -394,11 +394,15 @@
 
       const tiebreak = (a, b) => {
         if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints; // PTS (more)
+        // "Fewer picks" only rewards efficiency among players who've actually
+        // scored. At 0 points it would rank a no-show above someone who
+        // predicted and missed, so ignore it there — leaving them fully tied.
+        const picksCmp = a.totalPoints > 0 ? a.completedPicks - b.completedPicks : 0; // PICKS (less)
         if (tiebreakMode === 'exact-first') {
           if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
-          if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
+          if (picksCmp !== 0) return picksCmp;
         } else {
-          if (a.completedPicks !== b.completedPicks) return a.completedPicks - b.completedPicks; // PICKS (less)
+          if (picksCmp !== 0) return picksCmp;
           if (b.exactMatches !== a.exactMatches) return b.exactMatches - a.exactMatches; // EXACT (more)
         }
         return b.correctOutcomes - a.correctOutcomes; // OUTCOME (more)
