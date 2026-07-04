@@ -835,6 +835,8 @@
     const [editS1, setEditS1] = useState('');
     const [editS2, setEditS2] = useState('');
     const [editPen, setEditPen] = useState(null);
+    // Ticket density for the By Player view: 'cozy' (big tickets) or 'compact'.
+    const [density, setDensity] = useState('cozy');
 
     const activeUser = users.find(u => u.id === selectedUser);
     const userPreds = predictions.filter(p => p.userId === selectedUser);
@@ -875,6 +877,50 @@
       setPredictions(prev => prev.filter(p => p.id !== pred.id));
       if (editingId === pred.id) setEditingId(null);
     };
+
+    // Shared score editor (two inputs + a pens picker for knockout draws),
+    // used by both the cozy card and the compact row.
+    const scoreEditor = (pred) => (
+      <>
+        <div className="flex items-center gap-1 justify-center">
+          <input type="number" min="0" value={editS1} autoFocus
+            onChange={e => setEditS1(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+            className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl font-vt323 outline-none focus:border-[#D4AF37]" />
+          <span className="text-gray-400 font-bold">-</span>
+          <input type="number" min="0" value={editS2}
+            onChange={e => setEditS2(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+            className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl font-vt323 outline-none focus:border-[#D4AF37]" />
+        </div>
+        {isKnockoutRound(pred.round) && editS1 !== '' && editS2 !== '' && parseInt(editS1, 10) === parseInt(editS2, 10) && (
+          <div className="flex items-center gap-1 flex-wrap justify-center mt-1">
+            <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">Pens</span>
+            {['team1', 'team2'].map(side => (
+              <button key={side} type="button" onClick={() => setEditPen(side)}
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${editPen === side ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#D4AF37]'}`}>
+                {side === 'team1' ? pred.team1 : pred.team2}
+              </button>
+            ))}
+          </div>
+        )}
+      </>
+    );
+
+    // Shared edit/delete (or save/cancel while editing) button cluster.
+    const editControls = (pred) => (
+      editingId === pred.id ? (
+        <>
+          <button onClick={saveEdit} title="Save" className="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-1.5 rounded"><Check size={16} /></button>
+          <button onClick={cancelEdit} title="Cancel" className="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 p-1.5 rounded"><X size={16} /></button>
+        </>
+      ) : (
+        <>
+          <button onClick={() => startEdit(pred)} title="Edit score" className="text-gray-400 hover:text-[#1B4D3E] bg-gray-50 hover:bg-gray-100 p-1.5 rounded"><Pencil size={14} /></button>
+          <button onClick={() => deletePick(pred)} title="Delete pick" className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded"><Trash2 size={14} /></button>
+        </>
+      )
+    );
 
     return (
       <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300">
@@ -970,13 +1016,27 @@
         {/* Predictions List */}
         {activeUser && (
           <div className="bg-white p-6 shadow-lg rounded-lg border-2 border-[#e5e7eb]">
-            <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+            <div className="flex justify-between items-center gap-3 flex-wrap mb-6 border-b border-gray-100 pb-4">
               <h2 className="text-2xl font-black font-oswald uppercase tracking-wide text-[#1B4D3E] flex items-center gap-2">
                 <CheckCircle className="text-[#D4AF37]" />
                 {activeUser.name}'s Match Tickets
               </h2>
-              <div className="bg-gray-100 text-gray-600 font-bold px-4 py-1.5 rounded-full text-sm">
-                {userPreds.length} Tickets
+              <div className="flex items-center gap-3">
+                <div className="flex items-center bg-gray-100 rounded-full p-0.5 font-oswald">
+                  {[{ id: 'cozy', label: 'Cozy' }, { id: 'compact', label: 'Compact' }].map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => setDensity(d.id)}
+                      title={d.id === 'compact' ? 'Dense one-line rows' : 'Full-size tickets'}
+                      className={`px-3 py-1 text-xs font-bold rounded-full transition-all ${density === d.id ? 'bg-[#1B4D3E] text-white shadow-sm' : 'text-gray-500 hover:text-[#1B4D3E]'}`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="bg-gray-100 text-gray-600 font-bold px-4 py-1.5 rounded-full text-sm whitespace-nowrap">
+                  {userPreds.length} Tickets
+                </div>
               </div>
             </div>
 
@@ -990,6 +1050,54 @@
                   </p>
                 </div>
               </div>
+            ) : density === 'compact' ? (
+              <div className="border border-gray-100 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                {userPreds.map(pred => {
+                  const real = realResults.find(r => sameFixture(pred, r));
+                  const pts = calculatePoints(pred, real, koScoreMode);
+                  const exact = real && pts === 3;
+                  const editing = editingId === pred.id;
+                  const accent = !real ? 'border-l-gray-200'
+                    : pts === 3 ? 'border-l-[#D4AF37] bg-amber-50/60'
+                    : pts === 1 ? 'border-l-blue-400'
+                    : 'border-l-red-300';
+                  return (
+                    <div key={pred.id} className={`flex items-center gap-2 sm:gap-3 pl-2 pr-2 py-2 border-l-4 ${accent} ${editing ? 'bg-gray-50' : 'hover:bg-gray-50/70'} transition-colors`}>
+                      {/* Result marker */}
+                      <div className="w-9 shrink-0 flex justify-center">
+                        {real ? (
+                          exact
+                            ? <Star size={18} className="text-[#D4AF37] fill-[#D4AF37]" title="Exact score (3pt)" />
+                            : <span className={`text-xs font-black px-1.5 py-0.5 rounded ${pts === 1 ? 'text-blue-700 bg-blue-100' : 'text-red-500 bg-red-50'}`}>+{pts}</span>
+                        ) : <span className="w-2 h-2 rounded-full bg-amber-300" title="Kickoff pending"></span>}
+                      </div>
+                      {/* Match */}
+                      <div className="flex-1 min-w-0 flex items-center justify-center gap-1.5 text-sm">
+                        <span className="shrink-0">{getFlagEmoji(pred.team1)}</span>
+                        <span className={`font-bold truncate ${exact ? 'text-[#1B4D3E]' : 'text-gray-700'}`}>{pred.team1}</span>
+                        {editing ? (
+                          <div className="px-1 shrink-0">{scoreEditor(pred)}</div>
+                        ) : (
+                          <span className={`shrink-0 font-vt323 text-lg px-2 rounded ${exact ? 'bg-[#D4AF37] text-[#1B4D3E]' : 'bg-[#1B4D3E] text-white'}`}>{pred.score1}-{pred.score2}</span>
+                        )}
+                        <span className={`font-bold truncate ${exact ? 'text-[#1B4D3E]' : 'text-gray-700'}`}>{pred.team2}</span>
+                        <span className="shrink-0">{getFlagEmoji(pred.team2)}</span>
+                      </div>
+                      {/* Meta */}
+                      <div className="hidden sm:flex flex-col items-end text-right shrink-0 w-24 leading-tight">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 truncate w-full">{normalizeRound(pred.round)}</span>
+                        {real ? (
+                          <span className="text-[10px] font-bold text-gray-500 truncate w-full">act {real.score1}-{real.score2}{penWinnerTeam(real) ? ` · ${penWinnerTeam(real)} pk` : ''}</span>
+                        ) : (
+                          <span className="text-[9px] font-bold uppercase text-[#D4AF37]">pending</span>
+                        )}
+                      </div>
+                      {/* Controls */}
+                      <div className="flex items-center gap-1 shrink-0">{editControls(pred)}</div>
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div className="space-y-4">
                 {userPreds.map(pred => {
@@ -997,7 +1105,7 @@
                   const pts = calculatePoints(pred, real, koScoreMode);
 
                   return (
-                    <div key={pred.id} className="vintage-ticket hover:-rotate-1 transition-transform duration-200 p-3 sm:p-4 border border-[#e5e7eb] flex flex-wrap sm:flex-nowrap justify-center sm:justify-between items-center gap-2 sm:gap-4">
+                    <div key={pred.id} className={`vintage-ticket hover:-rotate-1 transition-transform duration-200 p-3 sm:p-4 border flex flex-wrap sm:flex-nowrap justify-center sm:justify-between items-center gap-2 sm:gap-4 ${real && pts === 3 ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/50 bg-gradient-to-b from-amber-50/70 to-white' : 'border-[#e5e7eb]'}`}>
                       {/* Home Team */}
                       <div className="flex-1 flex justify-end items-center gap-2 sm:gap-3 min-w-[100px]">
                         <span className="font-bold text-sm sm:text-lg text-right text-gray-800">{pred.team1}</span>
@@ -1006,46 +1114,13 @@
 
                       {/* Score Box */}
                       <div className="flex flex-col items-center px-2 sm:px-4 w-28 sm:w-36 z-10">
-                        <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1">{normalizeRound(pred.round)}</div>
-                        {editingId === pred.id ? (
+                        <div className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-1 flex items-center gap-1">
+                          {real && pts === 3 && <Star size={11} className="text-[#D4AF37] fill-[#D4AF37]" />}
+                          {normalizeRound(pred.round)}
+                        </div>
+                        {editingId === pred.id ? scoreEditor(pred) : (
                           <>
-                            <div className="flex items-center gap-1 w-full justify-center">
-                              <input
-                                type="number" min="0" value={editS1}
-                                onChange={e => setEditS1(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
-                                autoFocus
-                                className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
-                              />
-                              <span className="text-gray-400 font-bold">-</span>
-                              <input
-                                type="number" min="0" value={editS2}
-                                onChange={e => setEditS2(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
-                                className="w-10 sm:w-12 bg-white border-2 border-[#1B4D3E] rounded text-center text-xl sm:text-2xl font-vt323 outline-none focus:border-[#D4AF37]"
-                              />
-                            </div>
-                            {isKnockoutRound(pred.round) && editS1 !== '' && editS2 !== '' && parseInt(editS1, 10) === parseInt(editS2, 10) && (
-                              <div className="flex flex-col items-center gap-1 mt-1.5">
-                                <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400">Wins on pens</span>
-                                <div className="flex gap-1 flex-wrap justify-center">
-                                  {['team1', 'team2'].map(side => (
-                                    <button
-                                      key={side} type="button" onClick={() => setEditPen(side)}
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
-                                        editPen === side ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'bg-white text-gray-500 border-gray-300 hover:border-[#D4AF37]'
-                                      }`}
-                                    >
-                                      {side === 'team1' ? pred.team1 : pred.team2}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <div className="bg-[#1B4D3E] text-white font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center">
+                            <div className={`font-vt323 text-2xl sm:text-3xl px-3 sm:px-4 py-1 rounded shadow-inner tracking-widest w-full text-center ${real && pts === 3 ? 'bg-gradient-to-b from-[#D4AF37] to-amber-500 text-[#1B4D3E]' : 'bg-[#1B4D3E] text-white'}`}>
                               {pred.score1} - {pred.score2}
                             </div>
                             {isKnockoutRound(pred.round) && pred.score1 === pred.score2 && penWinnerTeam(pred) && (
@@ -1064,19 +1139,7 @@
                           </div>
                         )}
                         {/* Edit / delete (or save / cancel while editing) */}
-                        <div className="flex items-center gap-1 mt-2">
-                          {editingId === pred.id ? (
-                            <>
-                              <button onClick={saveEdit} title="Save" className="text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 p-1.5 rounded"><Check size={16} /></button>
-                              <button onClick={cancelEdit} title="Cancel" className="text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 p-1.5 rounded"><X size={16} /></button>
-                            </>
-                          ) : (
-                            <>
-                              <button onClick={() => startEdit(pred)} title="Edit score" className="text-gray-400 hover:text-[#1B4D3E] bg-gray-50 hover:bg-gray-100 p-1.5 rounded"><Pencil size={14} /></button>
-                              <button onClick={() => deletePick(pred)} title="Delete pick" className="text-red-400 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded"><Trash2 size={14} /></button>
-                            </>
-                          )}
-                        </div>
+                        <div className="flex items-center gap-1 mt-2">{editControls(pred)}</div>
                       </div>
 
                       {/* Away Team */}
@@ -1088,12 +1151,12 @@
                       {/* Points Result */}
                       <div className="w-auto sm:w-16 flex justify-end absolute sm:relative top-2 right-2 sm:top-auto sm:right-auto z-10">
                         {real && (
-                          <span className={`font-black text-sm sm:text-lg px-2 sm:px-3 py-1 rounded-md shadow-sm border ${
-                            pts === 3 ? 'bg-green-100 text-green-700 border-green-200' :
+                          <span className={`font-black text-sm sm:text-lg px-2 sm:px-3 py-1 rounded-md shadow-sm border flex items-center gap-1 ${
+                            pts === 3 ? 'bg-[#D4AF37] text-[#1B4D3E] border-amber-500' :
                             pts === 1 ? 'bg-blue-100 text-blue-700 border-blue-200' :
                             'bg-red-50 text-red-500 border-red-100'
                           }`}>
-                            +{pts}
+                            {pts === 3 && <Star size={12} className="fill-[#1B4D3E]" />}+{pts}
                           </span>
                         )}
                       </div>
