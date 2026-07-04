@@ -1099,7 +1099,7 @@
                 })}
               </div>
             ) : density === 'grid' ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              <div className="grid grid-flow-dense grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                 {userPreds.map(pred => {
                   const real = realResults.find(r => sameFixture(pred, r));
                   const pts = calculatePoints(pred, real, koScoreMode);
