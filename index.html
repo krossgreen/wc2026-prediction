@@ -562,6 +562,9 @@
     const [stampPos, setStampPos] = useState('top-right');
     const [stampRotation, setStampRotation] = useState(-11);
     const [stampColor, setStampColor] = useState('#C0392B');
+    // Fine nudge (px) from the chosen anchor: +X right, +Y down.
+    const [stampOffsetX, setStampOffsetX] = useState(0);
+    const [stampOffsetY, setStampOffsetY] = useState(0);
     // Show the ▲/▼ change-vs-last-matchday indicator next to each rank.
     const [showMovement, setShowMovement] = useState(true);
 
@@ -789,6 +792,39 @@
                       className="w-8 h-8 rounded cursor-pointer border-2 border-gray-200 bg-white p-0.5"
                     />
                   </div>
+
+                  <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+                  <div className="flex items-center gap-2 font-oswald">
+                    <label htmlFor="stamp-x" className="text-xs font-bold uppercase tracking-wider text-gray-500">Nudge</label>
+                    <input
+                      id="stamp-x"
+                      type="range" min="-150" max="150" step="1"
+                      value={stampOffsetX}
+                      onChange={(e) => setStampOffsetX(Number(e.target.value))}
+                      title="Horizontal offset (+ right)"
+                      className="w-20 accent-[#1B4D3E] cursor-pointer"
+                    />
+                    <span className="text-[10px] font-bold text-gray-400">X</span>
+                    <input
+                      id="stamp-y"
+                      type="range" min="-150" max="150" step="1"
+                      value={stampOffsetY}
+                      onChange={(e) => setStampOffsetY(Number(e.target.value))}
+                      title="Vertical offset (+ down)"
+                      className="w-20 accent-[#1B4D3E] cursor-pointer"
+                    />
+                    <span className="text-[10px] font-bold text-gray-400">Y</span>
+                    {(stampOffsetX !== 0 || stampOffsetY !== 0) && (
+                      <button
+                        onClick={() => { setStampOffsetX(0); setStampOffsetY(0); }}
+                        title="Reset nudge"
+                        className="text-gray-400 hover:text-gray-600 font-bold text-sm leading-none px-1"
+                      >
+                        ↺
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -817,7 +853,10 @@
               'bottom-right': 'bottom-3 right-3 sm:bottom-5 sm:right-6',
               'center': 'top-1/2 left-1/2'
             }[stampPos] || 'top-3 right-3 sm:top-5 sm:right-6';
-            const transform = (stampPos === 'center' ? 'translate(-50%, -50%) ' : '') + `rotate(${stampRotation}deg)`;
+            const base = stampPos === 'center'
+              ? `translate(calc(-50% + ${stampOffsetX}px), calc(-50% + ${stampOffsetY}px))`
+              : `translate(${stampOffsetX}px, ${stampOffsetY}px)`;
+            const transform = `${base} rotate(${stampRotation}deg)`;
             return (
               <div className={`absolute ${posClass} z-20 pointer-events-none select-none`} style={{ transform }}>
                 <div
