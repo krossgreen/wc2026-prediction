@@ -546,15 +546,23 @@
   // --- VIEWS ---
 
   function LeaderboardView({ leaderboard, realResults, tiebreakMode, setTiebreakMode, formCount, setFormCount, positionsCount, setPositionsCount, koScoreMode, setKoScoreMode }) {
-    const podiumRank1 = leaderboard.filter(u => u.rank === 1);
-    const podiumRank2 = leaderboard.filter(u => u.rank === 2);
-    const podiumRank3 = leaderboard.filter(u => u.rank === 3);
-    const leaderPoints = (leaderboard[0] && leaderboard[0].totalPoints) || 0;
     const [exporting, setExporting] = useState(false);
+    // Optionally drop players who haven't predicted any match that's been
+    // played yet (completedPicks === 0). Ranks/movement are still computed over
+    // everyone — this only filters what the board shows.
+    const [hideInactive, setHideInactive] = useState(false);
 
-    const totalPlayers = leaderboard.length;
+    const shownLeaderboard = hideInactive ? leaderboard.filter(u => u.completedPicks > 0) : leaderboard;
+    const hiddenCount = leaderboard.length - shownLeaderboard.length;
+
+    const podiumRank1 = shownLeaderboard.filter(u => u.rank === 1);
+    const podiumRank2 = shownLeaderboard.filter(u => u.rank === 2);
+    const podiumRank3 = shownLeaderboard.filter(u => u.rank === 3);
+    const leaderPoints = (leaderboard[0] && leaderboard[0].totalPoints) || 0;
+
+    const totalPlayers = shownLeaderboard.length;
     const visiblePositions = positionsCount === Infinity ? totalPlayers : Math.min(positionsCount, totalPlayers);
-    const displayedLeaderboard = leaderboard.slice(0, visiblePositions);
+    const displayedLeaderboard = shownLeaderboard.slice(0, visiblePositions);
 
     const totalPicks   = leaderboard.reduce((s, u) => s + u.completedPicks, 0);
     const totalExact   = leaderboard.reduce((s, u) => s + u.exactMatches, 0);
@@ -677,6 +685,19 @@
                   className="w-24 accent-[#1B4D3E] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <span className="text-sm font-bold text-[#1B4D3E] w-9 text-center">{positionsCount === Infinity ? 'All' : visiblePositions}</span>
+              </div>
+
+              <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+              <div className="flex items-center gap-2 font-oswald">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Show</label>
+                <button
+                  onClick={() => setHideInactive(v => !v)}
+                  title={hideInactive ? `Hiding ${hiddenCount} player${hiddenCount === 1 ? '' : 's'} with no completed picks` : 'Showing everyone, including players with no completed picks'}
+                  className={`text-sm font-bold rounded-full px-3 py-1.5 border-2 transition-all cursor-pointer ${hideInactive ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'bg-white text-[#1B4D3E] border-gray-200 hover:border-[#D4AF37]'}`}
+                >
+                  {hideInactive ? `Played only${hiddenCount > 0 ? ` (−${hiddenCount})` : ''}` : 'Everyone'}
+                </button>
               </div>
             </div>
           </div>
