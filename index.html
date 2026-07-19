@@ -555,6 +555,10 @@
     const shownLeaderboard = hideInactive ? leaderboard.filter(u => u.completedPicks > 0) : leaderboard;
     const hiddenCount = leaderboard.length - shownLeaderboard.length;
 
+    // Optional diagonal rubber-stamp over the standings (also captured in the
+    // saved image). Empty = no stamp.
+    const [stampText, setStampText] = useState('');
+
     const podiumRank1 = shownLeaderboard.filter(u => u.rank === 1);
     const podiumRank2 = shownLeaderboard.filter(u => u.rank === 2);
     const podiumRank3 = shownLeaderboard.filter(u => u.rank === 3);
@@ -699,6 +703,22 @@
                   {hideInactive ? `Played only${hiddenCount > 0 ? ` (−${hiddenCount})` : ''}` : 'Everyone'}
                 </button>
               </div>
+
+              <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+              <div className="flex items-center gap-2 font-oswald">
+                <label htmlFor="stamp-text" className="text-xs font-bold uppercase tracking-wider text-gray-500">Stamp</label>
+                <input
+                  id="stamp-text"
+                  type="text"
+                  value={stampText}
+                  onChange={(e) => setStampText(e.target.value)}
+                  maxLength={24}
+                  placeholder="none"
+                  title="Adds a diagonal stamp to the top-right of the standings (and the saved image). Leave blank for none."
+                  className="w-28 bg-white border-2 border-gray-200 rounded-full px-3 py-1 text-sm font-bold text-[#1B4D3E] outline-none focus:border-[#D4AF37]"
+                />
+              </div>
             </div>
           </div>
           <button
@@ -715,6 +735,18 @@
         <div id="standings-capture" className="bg-[#111] border-8 border-[#333] rounded-lg p-6 shadow-2xl relative overflow-hidden font-vt323">
           {/* Subtle grid pattern background for scoreboard */}
           <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#222 1px, transparent 1px), linear-gradient(90deg, #222 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+
+          {/* Optional diagonal rubber-stamp (top-right) */}
+          {stampText.trim() && (
+            <div className="absolute top-3 right-3 sm:top-5 sm:right-6 z-20 pointer-events-none select-none" style={{ transform: 'rotate(-11deg)' }}>
+              <div
+                className="font-oswald font-black uppercase tracking-[0.15em] text-[#D4AF37] border-[3px] border-[#D4AF37] rounded px-2.5 sm:px-3 py-0.5 sm:py-1 text-sm sm:text-2xl"
+                style={{ opacity: 0.9, boxShadow: '0 0 0 2px rgba(17,17,17,0.55), inset 0 0 12px rgba(212,175,55,0.15)' }}
+              >
+                {stampText}
+              </div>
+            </div>
+          )}
 
           <div className="relative z-10 flex flex-col gap-4">
             {/* Identity header — visible in the exported image */}
