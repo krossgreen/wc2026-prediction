@@ -565,6 +565,7 @@
     // Fine nudge (px) from the chosen anchor: +X right, +Y down.
     const [stampOffsetX, setStampOffsetX] = useState(0);
     const [stampOffsetY, setStampOffsetY] = useState(0);
+    const [stampScale, setStampScale] = useState(1);
     // Show the ▲/▼ change-vs-last-matchday indicator next to each rank.
     const [showMovement, setShowMovement] = useState(true);
 
@@ -782,6 +783,21 @@
                   <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
 
                   <div className="flex items-center gap-2 font-oswald">
+                    <label htmlFor="stamp-size" className="text-xs font-bold uppercase tracking-wider text-gray-500">Size</label>
+                    <input
+                      id="stamp-size"
+                      type="range" min="0.5" max="2.5" step="0.1"
+                      value={stampScale}
+                      onChange={(e) => setStampScale(Number(e.target.value))}
+                      title="Stamp size"
+                      className="w-24 accent-[#1B4D3E] cursor-pointer"
+                    />
+                    <span className="text-sm font-bold text-[#1B4D3E] w-9 text-center">{stampScale.toFixed(1)}×</span>
+                  </div>
+
+                  <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+                  <div className="flex items-center gap-2 font-oswald">
                     <label htmlFor="stamp-color" className="text-xs font-bold uppercase tracking-wider text-gray-500">Color</label>
                     <input
                       id="stamp-color"
@@ -856,7 +872,7 @@
             const base = stampPos === 'center'
               ? `translate(calc(-50% + ${stampOffsetX}px), calc(-50% + ${stampOffsetY}px))`
               : `translate(${stampOffsetX}px, ${stampOffsetY}px)`;
-            const transform = `${base} rotate(${stampRotation}deg)`;
+            const transform = `${base} rotate(${stampRotation}deg) scale(${stampScale})`;
             return (
               <div className={`absolute ${posClass} z-20 pointer-events-none select-none`} style={{ transform }}>
                 <div
