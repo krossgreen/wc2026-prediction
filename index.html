@@ -556,8 +556,12 @@
     const hiddenCount = leaderboard.length - shownLeaderboard.length;
 
     // Optional diagonal rubber-stamp over the standings (also captured in the
-    // saved image). Empty = no stamp.
+    // saved image). Empty = no stamp. Colour defaults to a stamp-red so it
+    // stands apart from the gold title.
     const [stampText, setStampText] = useState('');
+    const [stampPos, setStampPos] = useState('top-right');
+    const [stampRotation, setStampRotation] = useState(-11);
+    const [stampColor, setStampColor] = useState('#C0392B');
     // Show the ▲/▼ change-vs-last-matchday indicator next to each rank.
     const [showMovement, setShowMovement] = useState(true);
 
@@ -719,10 +723,13 @@
                 </button>
               </div>
 
-              <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+            </div>
 
+            {/* Stamp */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 font-oswald">Stamp</span>
               <div className="flex items-center gap-2 font-oswald">
-                <label htmlFor="stamp-text" className="text-xs font-bold uppercase tracking-wider text-gray-500">Stamp</label>
+                <label htmlFor="stamp-text" className="text-xs font-bold uppercase tracking-wider text-gray-500">Text</label>
                 <input
                   id="stamp-text"
                   type="text"
@@ -730,10 +737,60 @@
                   onChange={(e) => setStampText(e.target.value)}
                   maxLength={24}
                   placeholder="none"
-                  title="Adds a diagonal stamp to the top-right of the standings (and the saved image). Leave blank for none."
+                  title="Adds a diagonal stamp to the standings (and the saved image). Leave blank for none."
                   className="w-28 bg-white border-2 border-gray-200 rounded-full px-3 py-1 text-sm font-bold text-[#1B4D3E] outline-none focus:border-[#D4AF37]"
                 />
               </div>
+
+              {stampText.trim() && (
+                <>
+                  <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+                  <div className="flex items-center gap-2 font-oswald">
+                    <label htmlFor="stamp-pos" className="text-xs font-bold uppercase tracking-wider text-gray-500">Pos</label>
+                    <select
+                      id="stamp-pos"
+                      value={stampPos}
+                      onChange={(e) => setStampPos(e.target.value)}
+                      className="text-sm font-bold text-[#1B4D3E] bg-white border-2 border-gray-200 rounded-full px-3 py-1.5 outline-none focus:border-[#D4AF37] cursor-pointer"
+                    >
+                      <option value="top-left">Top left</option>
+                      <option value="top-right">Top right</option>
+                      <option value="bottom-left">Bottom left</option>
+                      <option value="bottom-right">Bottom right</option>
+                      <option value="center">Center</option>
+                    </select>
+                  </div>
+
+                  <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+                  <div className="flex items-center gap-2 font-oswald">
+                    <label htmlFor="stamp-rot" className="text-xs font-bold uppercase tracking-wider text-gray-500">Tilt</label>
+                    <input
+                      id="stamp-rot"
+                      type="range" min="-45" max="45" step="1"
+                      value={stampRotation}
+                      onChange={(e) => setStampRotation(Number(e.target.value))}
+                      title="Stamp rotation"
+                      className="w-24 accent-[#1B4D3E] cursor-pointer"
+                    />
+                    <span className="text-sm font-bold text-[#1B4D3E] w-9 text-center">{stampRotation}°</span>
+                  </div>
+
+                  <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+                  <div className="flex items-center gap-2 font-oswald">
+                    <label htmlFor="stamp-color" className="text-xs font-bold uppercase tracking-wider text-gray-500">Color</label>
+                    <input
+                      id="stamp-color"
+                      type="color"
+                      value={stampColor}
+                      onChange={(e) => setStampColor(e.target.value)}
+                      title="Stamp colour"
+                      className="w-8 h-8 rounded cursor-pointer border-2 border-gray-200 bg-white p-0.5"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <button
@@ -751,17 +808,27 @@
           {/* Subtle grid pattern background for scoreboard */}
           <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'linear-gradient(#222 1px, transparent 1px), linear-gradient(90deg, #222 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
-          {/* Optional diagonal rubber-stamp (top-right) */}
-          {stampText.trim() && (
-            <div className="absolute top-3 right-3 sm:top-5 sm:right-6 z-20 pointer-events-none select-none" style={{ transform: 'rotate(-11deg)' }}>
-              <div
-                className="font-oswald font-black uppercase tracking-[0.15em] text-[#D4AF37] border-[3px] border-[#D4AF37] rounded px-2.5 sm:px-3 py-0.5 sm:py-1 text-sm sm:text-2xl"
-                style={{ opacity: 0.9, boxShadow: '0 0 0 2px rgba(17,17,17,0.55), inset 0 0 12px rgba(212,175,55,0.15)' }}
-              >
-                {stampText}
+          {/* Optional diagonal rubber-stamp */}
+          {stampText.trim() && (() => {
+            const posClass = {
+              'top-left': 'top-3 left-3 sm:top-5 sm:left-6',
+              'top-right': 'top-3 right-3 sm:top-5 sm:right-6',
+              'bottom-left': 'bottom-3 left-3 sm:bottom-5 sm:left-6',
+              'bottom-right': 'bottom-3 right-3 sm:bottom-5 sm:right-6',
+              'center': 'top-1/2 left-1/2'
+            }[stampPos] || 'top-3 right-3 sm:top-5 sm:right-6';
+            const transform = (stampPos === 'center' ? 'translate(-50%, -50%) ' : '') + `rotate(${stampRotation}deg)`;
+            return (
+              <div className={`absolute ${posClass} z-20 pointer-events-none select-none`} style={{ transform }}>
+                <div
+                  className="font-oswald font-black uppercase tracking-[0.15em] border-[3px] rounded px-2.5 sm:px-3 py-0.5 sm:py-1 text-sm sm:text-2xl"
+                  style={{ color: stampColor, borderColor: stampColor, opacity: 0.9, boxShadow: '0 0 0 2px rgba(17,17,17,0.55)' }}
+                >
+                  {stampText}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <div className="relative z-10 flex flex-col gap-4">
             {/* Identity header — visible in the exported image */}
