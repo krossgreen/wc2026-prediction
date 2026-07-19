@@ -558,6 +558,8 @@
     // Optional diagonal rubber-stamp over the standings (also captured in the
     // saved image). Empty = no stamp.
     const [stampText, setStampText] = useState('');
+    // Show the ▲/▼ change-vs-last-matchday indicator next to each rank.
+    const [showMovement, setShowMovement] = useState(true);
 
     const podiumRank1 = shownLeaderboard.filter(u => u.rank === 1);
     const podiumRank2 = shownLeaderboard.filter(u => u.rank === 2);
@@ -694,6 +696,19 @@
               <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
 
               <div className="flex items-center gap-2 font-oswald">
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Movement</label>
+                <button
+                  onClick={() => setShowMovement(v => !v)}
+                  title="Show or hide the ▲▼ change-vs-last-matchday indicator"
+                  className={`text-sm font-bold rounded-full px-3 py-1.5 border-2 transition-all cursor-pointer ${showMovement ? 'bg-[#1B4D3E] text-white border-[#1B4D3E]' : 'bg-white text-[#1B4D3E] border-gray-200 hover:border-[#D4AF37]'}`}
+                >
+                  {showMovement ? 'On' : 'Off'}
+                </button>
+              </div>
+
+              <div className="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+              <div className="flex items-center gap-2 font-oswald">
                 <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Show</label>
                 <button
                   onClick={() => setHideInactive(v => !v)}
@@ -819,7 +834,7 @@
                     {user.rank === 2 && <Medal className="text-gray-400" size={14} />}
                     {user.rank === 3 && <Medal className="text-amber-700" size={14} />}
                     <span>{user.rank}</span>
-                    {user.movement != null && (
+                    {showMovement && user.movement != null && (
                       <span
                         className={`text-[11px] md:text-xs font-sans font-bold ${user.movement > 0 ? 'text-green-400' : user.movement < 0 ? 'text-red-400' : 'text-gray-500'}`}
                         title="Change vs last matchday"
